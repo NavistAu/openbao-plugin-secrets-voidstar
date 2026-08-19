@@ -371,13 +371,15 @@ test suite on every push.
 
 ## Contributing
 
-Contributions are welcome. Open an issue to discuss a change before
-sending a pull request for anything beyond a small fix.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+build/test workflow, branch model, and the bar for new configuration
+options. This project follows the
+[Contributor Covenant](CODE_OF_CONDUCT.md).
 
 ## Security
 
-Report a suspected vulnerability through GitHub's private security
-advisories for this repository rather than a public issue.
+See [SECURITY.md](SECURITY.md) for how to report a suspected
+vulnerability.
 
 ## License
 
