@@ -1,0 +1,43 @@
+# Task 10 (docs/PLAN.md):
+# build+test on every push/PR/manual run, cross-compiled release
+# artifacts + SHA256SUMS published to a forge release on tag push.
+#
+# `labels: {location: borma}` is the mandatory-label selector (DEC-0008)
+# that routes every step onto srv.borma's docker-backend Woodpecker
+# agent (WOODPECKER_AGENT_LABELS=!location=borma fences unlabelled work
+# off that agent — docs/gotchas.md). No docker socket is needed here:
+# this is a pure-Go pipeline, borma just supplies the docker-backend
+# runtime that runs each step's image as a plain container.
+#
+# aramaki (the deploy target, spec/plan Task 10) is linux_amd64 — that
+# release artifact is the load-bearing one. linux_arm64 is built and
+# published alongside it but is not (yet) consumed by any estate host.
+
+labels:
+  location: borma
+
+when:
+  - event: [push, pull_request, tag, manual]
+
+steps:
+  test:
+    image: golang:1.25
+    commands:
+      - go build ./...
+      - go test -race ./...
+
+  release:
+    image: golang:1.25
+    environment:
+      FORGEJO_TOKEN:
+        from_secret: forgejo_token
+    commands:
+      # All logic in ci/release.sh — Woodpecker performs config-time
+      # substitution on dollar-brace variable refs inside YAML commands and rejects some
+      # $$-escapes outright, so no shell variables may appear here.
+      - ./ci/release.sh
+    depends_on:
+      - test
+    when:
+      - event: tag
+        ref: refs/tags/v*
