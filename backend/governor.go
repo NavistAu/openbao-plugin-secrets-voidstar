@@ -6,7 +6,7 @@ import (
 )
 
 // loopbackInitBackoffBase/Max bound the exponential backoff between
-// loopback client (re-)construction attempts (spec §4: "init failure
+// loopback client (re-)construction attempts ("init failure
 // surfaces in status — never wedging the mount"). There is no
 // refresh-interval-style config knob to cap against here (unlike the
 // sibling engine's backoffDelay), so the ceiling is a fixed constant.
@@ -59,7 +59,7 @@ func (g *loopbackGovernor) recordResult(err error) {
 }
 
 // snapshot returns the read-only state Task 8's status endpoint will
-// surface (spec §4: "init failure surfaces in status").
+// surface ("init failure surfaces in status").
 func (g *loopbackGovernor) snapshot() (consecutiveFailures int, lastErr string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()

@@ -33,7 +33,7 @@ type Backend struct {
 	// every successful config write and loaded on mount (initialize).
 	config *Config
 
-	// client is the current loopback client (Task 4, spec §4),
+	// client is the current loopback client,
 	// constructed lazily by ensureLoopbackClient and invalidated on a
 	// classified-403 loopback error (handleLoopbackErr) for lazy
 	// re-login. clientFactory builds one from a validated Config —
@@ -46,7 +46,7 @@ type Backend struct {
 	loopbackGov *loopbackGovernor
 
 	// tokenTTL/tokenRenewedAt track the loopback token's renew-ahead-
-	// of-TTL schedule (spec §4): seeded by ensureLoopbackClient's login
+	// of-TTL schedule: seeded by ensureLoopbackClient's login
 	// TTL, refreshed by a successful periodic renewal, zeroed on
 	// invalidation.
 	tokenTTL       time.Duration
@@ -58,9 +58,8 @@ type Backend struct {
 	now func() time.Time
 
 	// failureCounters is Task 8's status.go bookkeeping: dereference
-	// failures keyed by target mount, then by failure class (spec §10:
-	// "failure counters keyed by target mount"). Never holds secret
-	// material — only mount names and fixed class strings.
+	// failures keyed by target mount, then by failure class. Never
+	// holds secret material — only mount names and fixed class strings.
 	failureCounters map[string]map[string]int
 }
 
@@ -148,9 +147,9 @@ var errLoopbackUnavailable = errors.New("voidstar: loopback client unavailable, 
 
 // ensureLoopbackClient returns the backend's current LoopbackClient,
 // constructing it lazily (and retryably, loopbackGov-paced) if it
-// doesn't exist yet — spec §4: "the client initializes lazily on first
+// doesn't exist yet — the client initializes lazily on first
 // use, with backoff, and init failure surfaces in status — never
-// wedging the mount." A successful construction seeds
+// wedging the mount. A successful construction seeds
 // tokenTTL/tokenRenewedAt from the login's TTL so renewLoopbackTokenIfDue
 // has a schedule to work from without a separate call.
 func (b *Backend) ensureLoopbackClient(ctx context.Context) (LoopbackClient, error) {
@@ -184,7 +183,7 @@ func (b *Backend) ensureLoopbackClient(ctx context.Context) (LoopbackClient, err
 
 // invalidateLoopbackClient discards the current client and its TTL
 // schedule, forcing the next ensureLoopbackClient call to lazily
-// re-login (spec §4: "invalidates the client and triggers re-login").
+// re-login.
 func (b *Backend) invalidateLoopbackClient() {
 	b.mu.Lock()
 	b.client = nil
@@ -194,7 +193,7 @@ func (b *Backend) invalidateLoopbackClient() {
 }
 
 // handleLoopbackErr classifies err from any loopback call (Read,
-// RenewSelf, ...) per spec §4: a 403 — indistinguishable from token
+// RenewSelf, ...): a 403 — indistinguishable from token
 // expiry, both handled by the same re-auth path — invalidates the
 // client for lazy re-login; any other error leaves the client in
 // place, since a transient failure is not evidence the token itself is
@@ -206,9 +205,8 @@ func (b *Backend) handleLoopbackErr(err error) {
 	}
 }
 
-// recordFailure increments mount's counter for failure class (spec
-// §10: "failure counters keyed by target mount", plan Task 8:
-// "incremented per failure class"). Called from every dereference
+// recordFailure increments mount's counter for failure class. Called
+// from every dereference
 // failure site (dereference.go, paths_data.go) with one of the
 // failureClass* constants (status.go).
 func (b *Backend) recordFailure(mount, class string) {
@@ -221,7 +219,7 @@ func (b *Backend) recordFailure(mount, class string) {
 }
 
 // loopbackRenewMarginFraction triggers renewal once this fraction of
-// the token's TTL has elapsed (spec §4: "renews it ahead of TTL").
+// the token's TTL has elapsed.
 const loopbackRenewMarginFraction = 2.0 / 3.0
 
 // renewLoopbackTokenIfDue renews the loopback token once
@@ -256,8 +254,8 @@ func (b *Backend) renewLoopbackTokenIfDue(ctx context.Context) {
 }
 
 // periodic is the framework.Backend PeriodicFunc: drives lazy loopback
-// client (re-)construction retries and the renew-ahead-of-TTL schedule
-// (spec §4). A construction failure is left for the next tick
+// client (re-)construction retries and the renew-ahead-of-TTL
+// schedule. A construction failure is left for the next tick
 // (loopbackGov already recorded and paced it) rather than returned —
 // mirrors the sibling's coldStart, a failed retry must not fail the
 // tick itself.

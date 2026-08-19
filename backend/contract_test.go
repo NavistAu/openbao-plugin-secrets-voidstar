@@ -9,7 +9,7 @@ import (
 )
 
 // TestStaticContract_LeaseBearingRevokesAndQuarantines drives the
-// spec §4 lease-bearing violation branch end-to-end: a non-empty
+// lease-bearing violation branch end-to-end: a non-empty
 // lease_id on the loopback response must be revoked, the mapping
 // quarantined with cause+outcome persisted, and the triggering read
 // fails 502 — with no further loopback read on a subsequent attempt
@@ -116,7 +116,7 @@ func TestStaticContract_RenewableOnlySkipsRevoke(t *testing.T) {
 }
 
 // TestStaticContract_RevocationFailureRecyclesToken covers the
-// RevokeLease-failure branch (spec §4 mitigation 1): the token must be
+// RevokeLease-failure branch: the token must be
 // recycled via RevokeSelf and invalidated for lazy re-login, and the
 // revocation outcome persisted on the quarantine reflects the failure.
 func TestStaticContract_RevocationFailureRecyclesToken(t *testing.T) {
@@ -231,7 +231,7 @@ func TestStaticContract_RewriteClearsQuarantine(t *testing.T) {
 		t.Fatal("want error triggering quarantine")
 	}
 
-	// Rewrite the mapping (spec §4: "quarantine clears only when the
+	// Rewrite the mapping ("quarantine clears only when the
 	// mapping is rewritten via vs/admin/map/<view>").
 	if _, err := writeMapping(t, b, storage, view, map[string]interface{}{"target": "kv/data/x"}); err != nil {
 		t.Fatalf("rewrite mapping: %v", err)

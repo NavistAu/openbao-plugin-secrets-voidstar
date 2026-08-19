@@ -170,8 +170,8 @@ func assertFailureCounter(t *testing.T, b *Backend, storage logical.Storage, mou
 }
 
 // TestPathStatus_NoSecretID walks the status response looking for the
-// configured secret_id value — it must appear nowhere (spec §6: the
-// loopback SecretID is write-only, never readable back).
+// configured secret_id value — it must appear nowhere. The loopback
+// SecretID is write-only, never readable back.
 func TestPathStatus_NoSecretID(t *testing.T) {
 	b, storage, _, _ := newDereferenceTestBackend(t)
 
@@ -196,9 +196,9 @@ func TestPathStatus_NoSecretID(t *testing.T) {
 
 // TestPathStatus_NoTargetValuesInStorage walks ALL storage entries
 // after a mix of reads and a quarantine drill, asserting a
-// fake-returned sentinel target value appears nowhere in storage
-// (spec §6: "target secret values are never persisted and never
-// cached to storage").
+// fake-returned sentinel target value appears nowhere in storage —
+// target secret values are never persisted and never cached to
+// storage.
 func TestPathStatus_NoTargetValuesInStorage(t *testing.T) {
 	b, storage, fake, _ := newDereferenceTestBackend(t)
 

@@ -174,7 +174,7 @@ func metadataRead(c *api.Client) {
 		ok = false
 	}
 	if ok {
-		record(group, true, "vs/metadata/team/simple document matches spec §5 shape")
+		record(group, true, "vs/metadata/team/simple document matches the expected shape")
 	}
 }
 

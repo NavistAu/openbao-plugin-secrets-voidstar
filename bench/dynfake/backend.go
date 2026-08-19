@@ -3,7 +3,7 @@
 // "leaky" read path mints a real,
 // renewable lease via a *logical.Secret response, so the drive script
 // can exercise voidstar's static-contract detection, revocation, and
-// quarantine (spec §4) against a genuine minted lease over the real
+// quarantine against a genuine minted lease over the real
 // plugin RPC + HTTP wire — not the unit tests' scripted fake
 // (backend/loopback_fake.go). Never built, registered, or shipped
 // outside bench/.

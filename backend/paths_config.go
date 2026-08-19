@@ -7,7 +7,7 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// pathConfig defines `vs/admin/config` (spec §8). It is a
+// pathConfig defines `vs/admin/config`. It is a
 // single write-only-as-a-whole resource (no Create/Update
 // distinction, no ExistenceCheck): every write is a full replacement,
 // which matches role_id/secret_id/api_addr being required on every
@@ -44,7 +44,7 @@ func pathConfig(b *Backend) *framework.Path {
 			},
 			"target_mount_allowlist": {
 				Type:        framework.TypeCommaStringSlice,
-				Description: "Exact mount names mapping targets are restricted to. Absent means every mount except the fixed reject list (spec §3) is permitted.",
+				Description: "Exact mount names mapping targets are restricted to. Absent means every mount except the fixed reject list is permitted.",
 			},
 		},
 
@@ -60,7 +60,7 @@ func pathConfig(b *Backend) *framework.Path {
 		},
 
 		HelpSynopsis:    "Configure the voidstar secrets engine.",
-		HelpDescription: "Configure the loopback AppRole, api_addr, and target mount allowlist for the voidstar secrets engine (spec §8).",
+		HelpDescription: "Configure the loopback AppRole, api_addr, and target mount allowlist for the voidstar secrets engine.",
 	}
 }
 

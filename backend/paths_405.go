@@ -8,7 +8,7 @@ import (
 )
 
 // path405 builds a framework.PathOperation whose callback always
-// fails with a 405 CodedError naming voidstar as read-only (spec §5).
+// fails with a 405 CodedError naming voidstar as read-only.
 // Registering this explicitly — rather than leaving a verb
 // unregistered — matters because an
 // unregistered verb also produces a 405 (via the SDK's
@@ -26,7 +26,7 @@ func path405(what string) *framework.PathOperation {
 // path404 builds a framework.PathOperation whose callback always
 // fails with an explicit 404 CodedError naming voidstar. Used by the
 // catch-all (paths_notfound.go) for "anything else on the KV-
-// emulation surface" (spec §5) — explicit rather than the SDK's
+// emulation surface" — explicit rather than the SDK's
 // implicit nil,nil-response 404 so the body names
 // the unmatched path.
 func path404() *framework.PathOperation {

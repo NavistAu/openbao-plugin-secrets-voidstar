@@ -7,10 +7,10 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// pathData defines `data/<view>` (spec §5): the consumer dereference
+// pathData defines `data/<view>`: the consumer dereference
 // read, KV v2 data-read wire-compatible. GET only in this task; Task 7
 // adds explicit 405 handlers for the write verbs on this same pattern
-// (spec §5: "any other verb on vs/data/* ... 405, error text naming
+// ("any other verb on vs/data/* ... 405, error text naming
 // voidstar as read-only").
 func pathData(b *Backend) *framework.Path {
 	return &framework.Path{
@@ -28,7 +28,7 @@ func pathData(b *Backend) *framework.Path {
 				Callback: b.pathDataRead,
 				Summary:  "Dereference a view to its target's current value.",
 			},
-			// Explicit 405s (spec §5: "any other verb on vs/data/* ...
+			// Explicit 405s ("any other verb on vs/data/* ...
 			// 405, error text naming voidstar as read-only") —
 			// must be registered, not left
 			// unregistered, or the 405 body text is the SDK's generic
@@ -40,11 +40,11 @@ func pathData(b *Backend) *framework.Path {
 		},
 
 		HelpSynopsis:    "Dereference a voidstar view.",
-		HelpDescription: "Server-side dereferences the view's mapped target and returns its value in KV v2 data-read shape (spec §5).",
+		HelpDescription: "Server-side dereferences the view's mapped target and returns its value in KV v2 data-read shape.",
 	}
 }
 
-// pathDataRead implements the spec §4/§5 dereference read path:
+// pathDataRead implements the dereference read path:
 // mapping lookup (404 unmapped), quarantine fast-fail (502, no
 // loopback call), loopback read, adapter unwrap, #field select,
 // response in KV v2 data-read shape with embedded synthetic per-

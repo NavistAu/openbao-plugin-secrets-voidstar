@@ -5,11 +5,11 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// reservedPathSpecs are the spec §5 KV-reserved paths: "any verb,
+// reservedPathSpecs are the KV-reserved paths: "any verb,
 // including GET" is a 405 on these — voidstar deliberately does not
 // implement KV v2's config/delete/undelete/destroy/detailed-metadata
 // semantics; vs/config in particular is NOT the KV config endpoint
-// (engine admin lives under vs/admin/, spec §5).
+// (engine admin lives under vs/admin/).
 var reservedPathSpecs = []struct {
 	pattern string
 	what    string
@@ -37,7 +37,7 @@ func reservedPaths(b *Backend) []*framework.Path {
 				logical.DeleteOperation: op,
 				logical.ListOperation:   op,
 			},
-			HelpSynopsis: "Reserved KV v2 path; not implemented by voidstar (spec §5).",
+			HelpSynopsis: "Reserved KV v2 path; not implemented by voidstar.",
 		}
 	}
 	return paths

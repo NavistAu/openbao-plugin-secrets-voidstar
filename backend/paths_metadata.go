@@ -9,10 +9,10 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// pathMetadata defines `metadata/<view>` (spec §5): GET returns the
+// pathMetadata defines `metadata/<view>`: GET returns the
 // full synthetic KV v2 metadata document for a view, LIST synthesizes
 // direct children from the mapping. Both stay supported; every write
-// verb on this pattern is an explicit 405 (spec §5).
+// verb on this pattern is an explicit 405.
 func pathMetadata(b *Backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "metadata/" + framework.MatchAllRegex("view"),
@@ -40,11 +40,11 @@ func pathMetadata(b *Backend) *framework.Path {
 		},
 
 		HelpSynopsis:    "Read or list voidstar view metadata.",
-		HelpDescription: "Synthetic KV v2 metadata document per view (spec §5); LIST synthesizes direct children from the mapping.",
+		HelpDescription: "Synthetic KV v2 metadata document per view; LIST synthesizes direct children from the mapping.",
 	}
 }
 
-// pathMetadataRead builds the spec §5 metadata-endpoint document:
+// pathMetadataRead builds the metadata-endpoint document:
 // always current_version/oldest_version 1 (no version history exists),
 // max_versions 0 (unbounded/not applicable — voidstar has no
 // versioning), created_time/updated_time both the mapping's write
@@ -79,7 +79,7 @@ func (b *Backend) pathMetadataRead(ctx context.Context, req *logical.Request, da
 	}}, nil
 }
 
-// pathMetadataList synthesizes a LIST from the mapping keys (spec §5):
+// pathMetadataList synthesizes a LIST from the mapping keys:
 // direct children only, intermediate segments suffixed "/", sorted;
 // an empty result is a 404 (KV v2 convention), distinct from
 // vs/admin/map/<prefix>'s LIST (paths_map.go's pathMapList), which

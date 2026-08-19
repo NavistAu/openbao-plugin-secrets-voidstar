@@ -10,11 +10,11 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// pathMap defines the `admin/map/<view>` family (spec §5): GET/POST/
+// pathMap defines the `admin/map/<view>` family: GET/POST/
 // DELETE on a specific view, and LIST on a prefix. All four operations
 // share one pattern and one capture ("view") because the admin surface
 // treats a view path and a list prefix as the same opaque string
-// (spec §3: "paths are opaque strings; hierarchy exists only through
+// ("paths are opaque strings; hierarchy exists only through
 // list") — the operation, not the pattern, decides whether it's read
 // as an exact key or a storage-list prefix.
 func pathMap(b *Backend) *framework.Path {
@@ -29,7 +29,7 @@ func pathMap(b *Backend) *framework.Path {
 			"target": {
 				Type:        framework.TypeString,
 				Required:    true,
-				Description: "Canonical target this view points to (spec §3): <mount>/<path>[#field].",
+				Description: "Canonical target this view points to: <mount>/<path>[#field].",
 			},
 			"adapter": {
 				Type:        framework.TypeString,
@@ -57,7 +57,7 @@ func pathMap(b *Backend) *framework.Path {
 		},
 
 		HelpSynopsis:    "Manage voidstar view-to-target mappings.",
-		HelpDescription: "CRUD for the view-to-target mapping entries voidstar dereferences (spec §3, §5).",
+		HelpDescription: "CRUD for the view-to-target mapping entries voidstar dereferences.",
 	}
 }
 
@@ -98,7 +98,7 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 	}
 
 	// A fresh MappingEntry, not a mutation of any existing one: this is
-	// what "rewrite clears quarantine" (spec §4 mitigation 2) means —
+	// what "rewrite clears quarantine" means —
 	// quarantine fields simply aren't carried forward.
 	entry := &MappingEntry{
 		Target:    target,

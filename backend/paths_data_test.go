@@ -13,7 +13,7 @@ import (
 // newDereferenceTestBackend builds a *Backend with config already
 // written and a fake loopback client wired in (mirroring
 // newLoopbackTestBackend), plus a buffered logger so dereference-
-// failure logging (spec §10) can be asserted directly.
+// failure logging can be asserted directly.
 func newDereferenceTestBackend(t *testing.T) (b *Backend, storage logical.Storage, fake *FakeLoopbackClient, logs *bytes.Buffer) {
 	t.Helper()
 

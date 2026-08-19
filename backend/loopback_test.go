@@ -168,8 +168,7 @@ func TestHandleLoopbackErr_403Invalidates(t *testing.T) {
 	}
 
 	// Lazy re-login: the next ensureLoopbackClient call constructs a
-	// fresh client (spec §4: "invalidates the client and triggers
-	// re-login").
+	// fresh client.
 	c, err := b.ensureLoopbackClient(context.Background())
 	if err != nil {
 		t.Fatalf("ensureLoopbackClient after invalidation: %v", err)

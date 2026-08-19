@@ -10,17 +10,17 @@ import (
 // configStorageKey is the single storage entry backing `vs/admin/config`.
 const configStorageKey = "config"
 
-// defaultApproleMount is the spec §8 default for approle_mount.
+// defaultApproleMount is the default for approle_mount.
 const defaultApproleMount = "approle"
 
 // fixedRejectMounts are unconditionally rejected as mapping targets
-// regardless of target_mount_allowlist (spec §3): "auth/*", "sys/*",
+// regardless of target_mount_allowlist: "auth/*", "sys/*",
 // "identity/*", "cubbyhole/*". (The engine's own mount is also
-// rejected per spec §3, but that check needs the request's mount
+// rejected, but that check needs the request's mount
 // point, not just config, and lives with Task 3's canonicalization.)
 var fixedRejectMounts = []string{"auth", "sys", "identity", "cubbyhole"}
 
-// Config is the persisted `vs/admin/config` entry (spec §8). A write
+// Config is the persisted `vs/admin/config` entry. A write
 // always replaces it wholesale — role_id/secret_id/api_addr are
 // required on every write, so there is no partial-update/merge case.
 type Config struct {
@@ -32,7 +32,7 @@ type Config struct {
 	TargetMountAllowlist []string `json:"target_mount_allowlist,omitempty"`
 }
 
-// validate applies the spec §8 required-field rules.
+// validate applies the required-field rules.
 func (c *Config) validate() error {
 	if c.RoleID == "" {
 		return errors.New("role_id is required")
@@ -47,7 +47,7 @@ func (c *Config) validate() error {
 }
 
 // targetMountAllowed reports whether mount may be used as a mapping
-// target's mount (spec §3, §8): the fixed reject list is rejected
+// target's mount: the fixed reject list is rejected
 // unconditionally; otherwise an absent/empty target_mount_allowlist
 // permits every other mount, and a non-empty allowlist narrows to
 // exactly its entries. A nil receiver (no config written yet) behaves
@@ -93,8 +93,7 @@ func getConfigFromStorage(ctx context.Context, storage logical.Storage) (*Config
 
 // applyConfig validates cfg, persists it, and caches it in-memory.
 // This is a pure storage operation — no client construction, no
-// network (that lands in Task 4, alongside the loopback client this
-// config feeds). Nothing is touched — storage included — if
+// network. Nothing is touched — storage included — if
 // validation fails.
 func (b *Backend) applyConfig(ctx context.Context, req *logical.Request, cfg *Config) error {
 	if err := cfg.validate(); err != nil {
@@ -117,7 +116,7 @@ func (b *Backend) applyConfig(ctx context.Context, req *logical.Request, cfg *Co
 }
 
 // configResponseData builds the `vs/admin/config` read response.
-// secret_id is intentionally absent — concealed on read per spec §8.
+// secret_id is intentionally absent — concealed on read.
 func configResponseData(cfg *Config) map[string]interface{} {
 	return map[string]interface{}{
 		"approle_mount":          cfg.ApproleMount,

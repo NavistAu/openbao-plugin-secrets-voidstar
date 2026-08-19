@@ -9,7 +9,7 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// Failure classes (spec §10, plan Task 8): the machine-readable keys
+// Failure classes (plan Task 8): the machine-readable keys
 // failure_counters is indexed by, one per distinct dereference failure
 // site. Distinct from dereference.go's derefClass* strings, which are
 // the human-readable text embedded in consumer-visible errors and log
@@ -22,9 +22,9 @@ const (
 	failureClassQuarantinedFastFail = "quarantined_fastfail"
 )
 
-// pathStatus defines `admin/status` (spec §5, §10): loopback client
+// pathStatus defines `admin/status`: loopback client
 // state, mapping count, failure counters, and quarantined mappings.
-// Admin-only, separate grant family from consumer reads (spec §6). No
+// Admin-only, separate grant family from consumer reads. No
 // secret material ever appears in the response.
 func pathStatus(b *Backend) *framework.Path {
 	return &framework.Path{
@@ -38,7 +38,7 @@ func pathStatus(b *Backend) *framework.Path {
 		},
 
 		HelpSynopsis:    "voidstar engine status.",
-		HelpDescription: "Loopback client health, mapping count, failure counters keyed by target mount, and quarantined mappings (spec §5, §10). No secret material.",
+		HelpDescription: "Loopback client health, mapping count, failure counters keyed by target mount, and quarantined mappings. No secret material.",
 	}
 }
 
@@ -93,8 +93,8 @@ func (b *Backend) pathStatusRead(ctx context.Context, req *logical.Request, data
 	}}, nil
 }
 
-// walkAllMappings recursively walks every `map/<view>` storage entry
-// (spec §8), returning each mapping keyed by its full view path.
+// walkAllMappings recursively walks every `map/<view>` storage entry,
+// returning each mapping keyed by its full view path.
 // storage.List only returns direct children (the same primitive
 // paths_map.go's pathMapList and paths_metadata.go's pathMetadataList
 // build their single-level listings on) — a full inventory for

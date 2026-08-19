@@ -9,7 +9,7 @@ import (
 )
 
 // TestMappingEntry_StorageRoundTrip proves the map/<view> storage
-// shape (spec §8) survives a JSON round trip through storage. No CRUD
+// shape survives a JSON round trip through storage. No CRUD
 // handler exists yet (Task 3); this exercises the schema directly.
 func TestMappingEntry_StorageRoundTrip(t *testing.T) {
 	_, storage := newTestBackend(t)

@@ -9,7 +9,7 @@ import (
 )
 
 // TestCanonicalizeTarget is the bulk of Task 3: every reject class and
-// every accept class from spec §3's target grammar, exercised directly
+// every accept class from the target grammar, exercised directly
 // against the pure function (fast, no storage/backend involved).
 func TestCanonicalizeTarget(t *testing.T) {
 	cases := []struct {

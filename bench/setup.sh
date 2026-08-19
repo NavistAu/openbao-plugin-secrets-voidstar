@@ -83,7 +83,7 @@ bao_ kv put kv/tree/b val=b1
 bao_ kv put kv/tree/nested/c val=c1
 bao_ write kv1/raw-item foo=bar
 
-# --- loopback AppRole (spec §4 contract: multi-use, non-expiring secret_id) ---
+# --- loopback AppRole (contract: multi-use, non-expiring secret_id) ---
 
 bao_ auth enable approle
 

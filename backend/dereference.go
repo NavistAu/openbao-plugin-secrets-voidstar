@@ -8,7 +8,7 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// Dereference failure classes (spec §5 error mechanics, §10 logging):
+// Dereference failure classes:
 // stable, distinct text per class so consumer-visible errors and
 // backend logs are unambiguous about what went wrong. Task 8 keys its
 // failure counters off a parallel, machine-readable set (failure
@@ -20,8 +20,8 @@ const (
 	derefClassQuarantined    = "view quarantined"
 )
 
-// splitTargetPathField splits a canonical target (spec §3:
-// "<mount>/<path>[#field]") into its loopback-read path and optional
+// splitTargetPathField splits a canonical target
+// ("<mount>/<path>[#field]") into its loopback-read path and optional
 // field selector. entry.Target is already validated canonical at
 // mapping-write time (mapping.go's canonicalizeTarget), so this is a
 // pure split, not a re-validation.
@@ -34,8 +34,8 @@ func splitTargetPathField(target string) (path, field string) {
 
 // targetMount returns the mount segment (first path component) of a
 // canonical target path (no #field suffix) — the value logged
-// unconditionally (spec §10) and surfaced in consumer-visible errors
-// only when expose_targets (spec §5, §6).
+// unconditionally and surfaced in consumer-visible errors
+// only when expose_targets.
 func targetMount(targetPath string) string {
 	if i := strings.IndexByte(targetPath, '/'); i >= 0 {
 		return targetPath[:i]
@@ -43,7 +43,7 @@ func targetMount(targetPath string) string {
 	return targetPath
 }
 
-// selectAdapter picks the kv2/raw adapter for targetPath (spec §3): an
+// selectAdapter picks the kv2/raw adapter for targetPath: an
 // explicit per-mapping override always wins; otherwise the choice is
 // by target shape — a path whose second segment is "data" (KV v2's own
 // data-endpoint convention, <mount>/data/<path>) is kv2, else raw.
@@ -60,13 +60,13 @@ func selectAdapter(override, targetPath string) string {
 
 // errKV2ShapeMismatch is the cause wrapped into the upstream-read-
 // failure class when a kv2-adapter target's loopback response doesn't
-// have the expected data.data envelope (spec §3) — a shape surprise
+// have the expected data.data envelope — a shape surprise
 // from the upstream target, not a missing-field selection, so it's
 // classified with upstream failures rather than derefClassMissingField.
 var errKV2ShapeMismatch = fmt.Errorf("voidstar: kv2 adapter: response missing data.data envelope")
 
 // unwrapAdapter applies the chosen adapter to a loopback response's
-// raw data (spec §3): kv2 unwraps the data.data envelope, raw passes
+// raw data: kv2 unwraps the data.data envelope, raw passes
 // data through unmodified.
 func unwrapAdapter(adapter string, raw map[string]interface{}) (map[string]interface{}, error) {
 	if adapter != "kv2" {
@@ -83,7 +83,7 @@ func unwrapAdapter(adapter string, raw map[string]interface{}) (map[string]inter
 	return m, nil
 }
 
-// selectField applies the spec §3 #field convention: {value: <field
+// selectField applies the #field convention: {value: <field
 // value>}. ok is false when the field is absent from data.
 func selectField(data map[string]interface{}, field string) (map[string]interface{}, bool) {
 	val, ok := data[field]
@@ -95,7 +95,7 @@ func selectField(data map[string]interface{}, field string) (map[string]interfac
 
 // dereferenceErrorMsg builds a consumer-visible error string for
 // class, always identifying view, and mount only when
-// cfg.ExposeTargets (spec §5: "target mount name appears only when
+// cfg.ExposeTargets ("target mount name appears only when
 // expose_targets=true, otherwise redacted"). class alone makes the
 // string stable and distinct per failure class.
 func dereferenceErrorMsg(cfg *Config, class, view, mount string) string {
@@ -105,15 +105,15 @@ func dereferenceErrorMsg(cfg *Config, class, view, mount string) string {
 	return fmt.Sprintf("voidstar: %s for view %q", class, view)
 }
 
-// logDereferenceFailure logs view path + target mount + cause (spec
-// §10) unconditionally and unredacted — logs are operator-side (spec
-// §10: "values never logged; log redaction does not apply").
+// logDereferenceFailure logs view path + target mount + cause
+// unconditionally and unredacted — logs are operator-side ("values
+// never logged; log redaction does not apply").
 func (b *Backend) logDereferenceFailure(view, mount, cause string) {
 	b.Logger().Warn("voidstar: dereference failed", "view", view, "target_mount", mount, "cause", cause)
 }
 
 // syntheticVersionMetadata builds the per-version synthetic metadata
-// embedded in a data read (spec §5): always version 1, created_time is
+// embedded in a data read: always version 1, created_time is
 // the mapping's write time, no delete/destroy semantics exist so
 // deletion_time/destroyed are always the empty/false zero values.
 func syntheticVersionMetadata(entry *MappingEntry, cfg *Config) map[string]interface{} {
@@ -127,7 +127,7 @@ func syntheticVersionMetadata(entry *MappingEntry, cfg *Config) map[string]inter
 }
 
 // customMetadata is {voidstar_target: <target>} only when
-// cfg.ExposeTargets, else {} (spec §5).
+// cfg.ExposeTargets, else {}.
 func customMetadata(cfg *Config, target string) map[string]interface{} {
 	if cfg != nil && cfg.ExposeTargets {
 		return map[string]interface{}{"voidstar_target": target}
@@ -135,12 +135,12 @@ func customMetadata(cfg *Config, target string) map[string]interface{} {
 	return map[string]interface{}{}
 }
 
-// checkStaticContract enforces spec §4's static-contract detection: a
+// checkStaticContract enforces the static-contract detection: a
 // loopback response violates it when it carries a non-empty leaseID,
 // or renewable=true with an empty leaseID. Neither holds here — the
 // static contract is intact — so this is a no-op.
 //
-// A violation triggers, strictly in order (spec §4 mitigation 1-3):
+// A violation triggers, strictly in order:
 //  1. Revoke what there is to revoke — RevokeLease(leaseID) when
 //     leaseID is non-empty; the renewable-only case has no lease to
 //     revoke, so this step is skipped entirely (cleanup is vacuous,
@@ -152,7 +152,7 @@ func customMetadata(cfg *Config, target string) map[string]interface{} {
 //     (idempotent revoke), but a RevokeLease *error* is a genuine
 //     connectivity/permission failure worth reacting to.
 //  2. Quarantine the mapping persistently (cause + revocation outcome
-//     on the MappingEntry, spec §4 mitigation 2) so every subsequent
+//     on the MappingEntry) so every subsequent
 //     read of this view fast-fails without a loopback read.
 //  3. Fail the triggering read itself with the same coded 502.
 func (b *Backend) checkStaticContract(ctx context.Context, storage logical.Storage, client LoopbackClient, view string, entry *MappingEntry, mount, leaseID string, renewable bool) error {
@@ -188,9 +188,9 @@ func (b *Backend) checkStaticContract(ctx context.Context, storage logical.Stora
 }
 
 // quarantineMapping persists view's mapping entry with quarantine
-// fields set (spec §4 mitigation 2), preserving its Target/Adapter/
+// fields set, preserving its Target/Adapter/
 // WriteTime as-is — only a rewrite through vs/admin/map/<view>
-// (paths_map.go's pathMapWrite) clears quarantine (spec §4: "clears
+// (paths_map.go's pathMapWrite) clears quarantine ("clears
 // only when the mapping is rewritten").
 func quarantineMapping(ctx context.Context, storage logical.Storage, view string, entry *MappingEntry, cause, revocationOutcome string) error {
 	updated := *entry

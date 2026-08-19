@@ -9,25 +9,25 @@ import (
 )
 
 // LoopbackClient is the seam between the backend and the OpenBao API
-// client voidstar authenticates to its own instance with (spec §4)
-// to dereference targets. Every loopback call goes through here so
+// client voidstar authenticates to its own instance with, to
+// dereference targets. Every loopback call goes through here so
 // tests substitute a fake (loopback_fake.go) — no network in tests.
 type LoopbackClient interface {
 	// Read performs a logical read of path and returns its data
 	// unmodified (adapter unwrapping is Task 5's job) along with the
-	// lease fields spec §4's static-contract detection needs.
+	// lease fields the static-contract detection needs.
 	Read(ctx context.Context, path string) (data map[string]interface{}, leaseID string, renewable bool, err error)
-	// RevokeLease revokes leaseID (spec §4 mitigation 1,
-	// sys/leases/revoke). Revoking an already-gone
+	// RevokeLease revokes leaseID via
+	// sys/leases/revoke. Revoking an already-gone
 	// lease ID does not error (idempotent revoke) — callers must not
 	// infer "there was nothing to revoke" from a nil error.
 	RevokeLease(ctx context.Context, leaseID string) error
 	// RevokeSelf revokes the loopback token itself
-	// (auth/token/revoke-self), cascading to its child leases (spec §4
-	// mitigation 1 fallback when RevokeLease fails).
+	// (auth/token/revoke-self), cascading to its child leases. Used as
+	// the fallback when RevokeLease fails.
 	RevokeSelf(ctx context.Context) error
-	// RenewSelf renews the loopback token ahead of its TTL (spec §4
-	// lifecycle) and returns the renewed TTL in seconds.
+	// RenewSelf renews the loopback token ahead of its TTL
+	// and returns the renewed TTL in seconds.
 	RenewSelf(ctx context.Context) (ttlSeconds int, err error)
 }
 
@@ -108,11 +108,11 @@ func (s *sdkLoopbackClient) RenewSelf(ctx context.Context) (int, error) {
 	return secret.Auth.LeaseDuration, nil
 }
 
-// is403 classifies a loopback call error as an HTTP 403 (spec §4:
-// "Any 403 or token-expiry on a loopback call invalidates the client
-// ... expiry is indistinguishable from revocation and both are
-// handled by the same re-auth path" — so a token-expiry manifests as a
-// 403 permission-denied response from the revoke-self
+// is403 classifies a loopback call error as an HTTP 403 ("Any 403 or
+// token-expiry on a loopback call invalidates the client ... expiry is
+// indistinguishable from revocation and both are handled by the same
+// re-auth path" — so a token-expiry manifests as a 403
+// permission-denied response from the revoke-self
 // probe, and needs no separate classification). Handles both the real
 // api/v2 client's *api.ResponseError (a StatusCode field) and the
 // fake's *statusError (a StatusCode method) so the same classification

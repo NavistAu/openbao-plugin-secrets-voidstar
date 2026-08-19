@@ -18,7 +18,7 @@ func doRequest(b *Backend, storage logical.Storage, op logical.Operation, path s
 	return b.HandleRequest(context.Background(), req)
 }
 
-// TestVerbMatrix_405 is the table-driven sweep over the spec §5 405
+// TestVerbMatrix_405 is the table-driven sweep over the 405
 // matrix: write verbs on data/* and metadata/*, and every verb
 // (including read/list) on the KV-reserved paths. Each must be an
 // explicitly-registered 405 naming voidstar, not the SDK's generic
@@ -91,7 +91,7 @@ func TestVerbMatrix_SupportedVerbsStillWork(t *testing.T) {
 }
 
 // TestVerbMatrix_404CatchAll sweeps the "anything else on the KV-
-// emulation surface" catch-all (spec §5) across verbs and unrelated
+// emulation surface" catch-all across verbs and unrelated
 // paths.
 func TestVerbMatrix_404CatchAll(t *testing.T) {
 	cases := []struct {
@@ -121,7 +121,7 @@ func TestVerbMatrix_404CatchAll(t *testing.T) {
 
 // TestVerbMatrix_AdminSurfaceNotShadowed proves vs/admin/* is routed
 // to its own handlers, not swallowed by pathNotFound's ".*" catch-all
-// (spec §5: the catch-all "excludes the vs/admin/* family"):
+// (the catch-all "excludes the vs/admin/* family"):
 // admin/config with no config written returns pathConfigRead's own
 // nil,nil "nothing written yet" — not the catch-all's explicit
 // CodedError(404, ...).
