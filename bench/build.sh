@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Task 9 bench gate: cross-compile the voidstar plugin and the
+# Bench gate: cross-compile the voidstar plugin and the
 # throwaway dynfake lease-emitting test plugin for the bench container
 # (linux/arm64 — matches the arm64 Mac host's native docker platform;
 # swap GOARCH=amd64 on an amd64 host). Mirrors the sibling's

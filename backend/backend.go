@@ -57,7 +57,7 @@ type Backend struct {
 	// sleeps.
 	now func() time.Time
 
-	// failureCounters is Task 8's status.go bookkeeping: dereference
+	// failureCounters backs the admin/status bookkeeping: dereference
 	// failures keyed by target mount, then by failure class. Never
 	// holds secret material — only mount names and fixed class strings.
 	failureCounters map[string]map[string]int
@@ -121,7 +121,7 @@ func (b *Backend) currentConfig() *Config {
 // initialize is the framework.Backend InitializeFunc, invoked just
 // after the plugin is mounted. Config load is a pure storage read —
 // no client construction, no network — so a restart never blocks on
-// the loopback client (Task 4) being reachable; a missing or
+// the loopback client being reachable; a missing or
 // unreadable config just leaves b.config nil rather than failing the
 // mount.
 func (b *Backend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
@@ -197,8 +197,8 @@ func (b *Backend) invalidateLoopbackClient() {
 // expiry, both handled by the same re-auth path — invalidates the
 // client for lazy re-login; any other error leaves the client in
 // place, since a transient failure is not evidence the token itself is
-// bad. Task 5's dereference path will call this too; Task 4 only wires
-// it into renewal.
+// bad. The dereference path also calls this; periodic only wires
+// it into renewal here.
 func (b *Backend) handleLoopbackErr(err error) {
 	if is403(err) {
 		b.invalidateLoopbackClient()

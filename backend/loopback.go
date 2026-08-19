@@ -14,7 +14,8 @@ import (
 // tests substitute a fake (loopback_fake.go) — no network in tests.
 type LoopbackClient interface {
 	// Read performs a logical read of path and returns its data
-	// unmodified (adapter unwrapping is Task 5's job) along with the
+	// unmodified (unwrapAdapter in dereference.go handles adapter
+	// unwrapping) along with the
 	// lease fields the static-contract detection needs.
 	Read(ctx context.Context, path string) (data map[string]interface{}, leaseID string, renewable bool, err error)
 	// RevokeLease revokes leaseID via

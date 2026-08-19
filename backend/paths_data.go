@@ -8,9 +8,9 @@ import (
 )
 
 // pathData defines `data/<view>`: the consumer dereference
-// read, KV v2 data-read wire-compatible. GET only in this task; Task 7
-// adds explicit 405 handlers for the write verbs on this same pattern
-// ("any other verb on vs/data/* ... 405, error text naming
+// read, KV v2 data-read wire-compatible. GET returns the dereferenced
+// value; explicit 405 handlers cover the write verbs on this same
+// pattern ("any other verb on vs/data/* ... 405, error text naming
 // voidstar as read-only").
 func pathData(b *Backend) *framework.Path {
 	return &framework.Path{
@@ -32,7 +32,7 @@ func pathData(b *Backend) *framework.Path {
 			// 405, error text naming voidstar as read-only") —
 			// must be registered, not left
 			// unregistered, or the 405 body text is the SDK's generic
-			// one instead of this spec-mandated one.
+			// one instead of this one naming voidstar.
 			logical.CreateOperation: path405("data/<view> is read-only"),
 			logical.UpdateOperation: path405("data/<view> is read-only"),
 			logical.PatchOperation:  path405("data/<view> is read-only"),

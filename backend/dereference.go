@@ -10,7 +10,7 @@ import (
 
 // Dereference failure classes:
 // stable, distinct text per class so consumer-visible errors and
-// backend logs are unambiguous about what went wrong. Task 8 keys its
+// backend logs are unambiguous about what went wrong. admin/status keys its
 // failure counters off a parallel, machine-readable set (failure
 // classes in status.go), not these human-readable strings.
 const (

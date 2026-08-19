@@ -1,6 +1,6 @@
-// Bench-only OpenBao server config (Task 9 bench gate). Not used in
+// Bench-only OpenBao server config. Not used in
 // production — the estate installs this plugin via IaC-managed
-// tofu/ansible (Task 10), never this file. Copied verbatim from the
+// tofu/ansible, never this file. Copied verbatim from the
 // sibling repo's bench/config/bao.hcl — zero changes needed.
 storage "file" {
   path = "/bao/data"

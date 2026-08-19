@@ -9,7 +9,7 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// Failure classes (plan Task 8): the machine-readable keys
+// Failure classes: the machine-readable keys
 // failure_counters is indexed by, one per distinct dereference failure
 // site. Distinct from dereference.go's derefClass* strings, which are
 // the human-readable text embedded in consumer-visible errors and log

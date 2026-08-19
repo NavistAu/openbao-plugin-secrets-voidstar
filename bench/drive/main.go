@@ -1,8 +1,8 @@
-// Command drive is the Task 9 bench gate's assertion runner. It hits
+// Command drive is the bench gate's assertion runner. It hits
 // the scratch vs-bench server (bench/setup.sh already wrote config +
 // every mapping) with real HTTP reads via the api/v2 client — no
 // backend-internal calls, no fakes — and checks every behavior
-// Task 9 requires, printing PASS/FAIL per assertion
+// the bench gate requires, printing PASS/FAIL per assertion
 // group. Exits non-zero if anything failed.
 package main
 
@@ -272,7 +272,7 @@ func verbMatrix(c *api.Client) {
 	}
 }
 
-// --- group: lease-quarantine-drill (mandatory, plan Task 9) ---
+// --- group: lease-quarantine-drill (mandatory) ---
 
 func leaseQuarantineDrill(c *api.Client) {
 	const group = "lease-quarantine-drill"

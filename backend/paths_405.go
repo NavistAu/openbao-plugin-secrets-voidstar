@@ -13,7 +13,7 @@ import (
 // unregistered — matters because an
 // unregistered verb also produces a 405 (via the SDK's
 // ErrUnsupportedOperation), but with its generic "unsupported
-// operation" text, not this spec-mandated one naming voidstar.
+// operation" text, not this one naming voidstar.
 func path405(what string) *framework.PathOperation {
 	return &framework.PathOperation{
 		Callback: func(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {

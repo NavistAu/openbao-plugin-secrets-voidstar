@@ -115,13 +115,38 @@ bao plugin register -sha256="$SHA256" -command=openbao-plugin-secrets-voidstar s
 bao secrets enable -path=vs vs
 ```
 
-Configure the engine once it is mounted (see Configuration reference
-below):
+### Loopback AppRole
+
+voidstar authenticates to its own OpenBao instance via AppRole to
+perform dereference reads. Create the AppRole with a multi-use,
+non-expiring `secret_id`: `secret_id_num_uses=0` and `secret_id_ttl=0`.
+A single-use or TTL'd `secret_id` permanently breaks voidstar's
+restart recovery (see Design constraints).
+
+```sh
+bao auth enable approle
+bao write auth/approle/role/voidstar-loopback \
+  token_policies=voidstar-loopback \
+  secret_id_num_uses=0 \
+  secret_id_ttl=0
+bao read auth/approle/role/voidstar-loopback/role-id
+bao write -f auth/approle/role/voidstar-loopback/secret-id
+```
+
+`token_policies` names a policy granting the resulting token read
+access on every target path voidstar's mappings will dereference. The
+`role-id` read and `secret-id` write each print a value; use them in
+the config write below.
+
+### Configure the engine
+
+Write the engine configuration once it is mounted (see Configuration
+reference below for every field):
 
 ```sh
 bao write vs/admin/config \
-  role_id=<approle-role-id> \
-  secret_id=<approle-secret-id> \
+  role_id=<role-id-from-above> \
+  secret_id=<secret-id-from-above> \
   api_addr=https://127.0.0.1:8200
 ```
 

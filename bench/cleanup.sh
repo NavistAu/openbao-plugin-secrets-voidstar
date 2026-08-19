@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Task 9 bench gate cleanup. Removes the scratch vs-bench container.
+# Bench gate cleanup. Removes the scratch vs-bench container.
 # Safe to run multiple times.
 set -uo pipefail
 cd "$(dirname "$0")/.."

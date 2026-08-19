@@ -8,8 +8,8 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// TestCanonicalizeTarget is the bulk of Task 3: every reject class and
-// every accept class from the target grammar, exercised directly
+// TestCanonicalizeTarget is the bulk of the canonicalization coverage:
+// every reject class and every accept class from the target grammar, exercised directly
 // against the pure function (fast, no storage/backend involved).
 func TestCanonicalizeTarget(t *testing.T) {
 	cases := []struct {
@@ -359,7 +359,7 @@ func TestPathMap_TargetMountAllowlist(t *testing.T) {
 }
 
 func TestPathMap_WriteBeforeConfig_FixedRejectStillApplies(t *testing.T) {
-	// No admin/config write at all — Task 3's mapping writes must stay
+	// No admin/config write at all — mapping writes must stay
 	// callable, and the fixed reject list (auth/sys/identity/cubbyhole)
 	// must still be enforced via Config.targetMountAllowed's nil-safe
 	// path, even though b.currentConfig() is nil.

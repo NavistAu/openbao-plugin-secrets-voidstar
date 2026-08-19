@@ -17,7 +17,7 @@ const defaultApproleMount = "approle"
 // regardless of target_mount_allowlist: "auth/*", "sys/*",
 // "identity/*", "cubbyhole/*". (The engine's own mount is also
 // rejected, but that check needs the request's mount
-// point, not just config, and lives with Task 3's canonicalization.)
+// point, not just config, and lives with mapping.go's canonicalization.)
 var fixedRejectMounts = []string{"auth", "sys", "identity", "cubbyhole"}
 
 // Config is the persisted `vs/admin/config` entry. A write
@@ -52,7 +52,7 @@ func (c *Config) validate() error {
 // permits every other mount, and a non-empty allowlist narrows to
 // exactly its entries. A nil receiver (no config written yet) behaves
 // like an unconfigured allowlist: fixed rejects still apply, every
-// other mount is permitted — Task 3's mapping writes must stay
+// other mount is permitted — mapping writes must stay
 // callable before `vs/admin/config` has ever been written.
 func (c *Config) targetMountAllowed(mount string) bool {
 	for _, r := range fixedRejectMounts {

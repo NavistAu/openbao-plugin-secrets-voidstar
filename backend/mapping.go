@@ -7,8 +7,8 @@ import (
 )
 
 // mapStoragePrefix namespaces every mapping entry's storage key
-// (`map/<view>`). CRUD handlers land in Task 3; this file
-// defines the storage shape so Task 3 builds on a settled schema.
+// (`map/<view>`). This file
+// defines the storage shape the CRUD handlers (paths_map.go) build on.
 const mapStoragePrefix = "map/"
 
 // mapStorageKey returns the storage key for view's mapping entry.

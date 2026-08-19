@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Task 9 bench gate: drive the assertions (bench/drive) against a
+# Bench gate: drive the assertions (bench/drive) against a
 # vs-bench server bench/setup.sh already stood up and configured.
 # Builds bench/drive for the host (not cross-compiled — it talks to
 # the container over the published port, it doesn't run inside it).

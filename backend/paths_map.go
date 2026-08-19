@@ -33,7 +33,7 @@ func pathMap(b *Backend) *framework.Path {
 			},
 			"adapter": {
 				Type:        framework.TypeString,
-				Description: `Adapter override: "kv2" or "raw". Empty auto-detects by target shape (Task 5).`,
+				Description: `Adapter override: "kv2" or "raw". Empty auto-detects by target shape.`,
 			},
 		},
 

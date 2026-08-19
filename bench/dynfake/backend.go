@@ -1,5 +1,5 @@
 // Command dynfake is a throwaway lease-emitting secrets engine, built
-// only for Task 9's mandatory bench lease/quarantine drill: its
+// only for the bench gate's mandatory lease/quarantine drill: its
 // "leaky" read path mints a real,
 // renewable lease via a *logical.Secret response, so the drive script
 // can exercise voidstar's static-contract detection, revocation, and
@@ -21,7 +21,7 @@ import (
 // dynfakeBackend adds one field to framework.Backend: reads, an
 // atomic counter the drive script polls via "count" to prove whether
 // a second read ever reached this plugin — the quarantine fast-fail
-// proof (plan Task 9: "a subsequent read fast-fails without touching
+// proof ("a subsequent read fast-fails without touching
 // dynfake").
 type dynfakeBackend struct {
 	*framework.Backend

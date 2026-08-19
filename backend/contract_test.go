@@ -13,7 +13,7 @@ import (
 // lease_id on the loopback response must be revoked, the mapping
 // quarantined with cause+outcome persisted, and the triggering read
 // fails 502 — with no further loopback read on a subsequent attempt
-// (fast-fail per Task 5).
+// (fast-fail).
 func TestStaticContract_LeaseBearingRevokesAndQuarantines(t *testing.T) {
 	b, storage, fake, logs := newDereferenceTestBackend(t)
 
@@ -212,7 +212,7 @@ func TestStaticContract_QuarantinePersistsAcrossReload(t *testing.T) {
 
 // TestStaticContract_RewriteClearsQuarantine is the integration
 // assertion (through the read path) for the rewrite-clears-quarantine
-// behavior Task 3 already covers at the storage level
+// behavior already covered at the storage level
 // (paths_map_test.go's TestPathMap_RewriteClearsQuarantine): after a
 // quarantine-triggering read, rewriting the mapping via
 // vs/admin/map/<view> must make the view readable again.

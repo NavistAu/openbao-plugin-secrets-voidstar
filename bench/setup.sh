@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Task 9 bench gate: stand up a scratch OpenBao 2.5.5 server-mode
+# Bench gate: stand up a scratch OpenBao 2.5.5 server-mode
 # container, init/unseal it, register+mount voidstar and the dynfake
-# lease-emitting test plugin (mechanism verbatim
+# lease-emitting test plugin (the mechanism is copied verbatim,
 # down to the container/port cosmetics differing from the sibling's
 # 18200), seed KV v2 + KV v1 targets, wire the loopback AppRole
 # (contract: secret_id_num_uses=0, secret_id_ttl=0),
@@ -23,7 +23,7 @@ docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 
 # On any failure partway through setup, remove the half-configured
 # container rather than leaving it dangling for the next run to trip
-# over (task 9: "containers removed ... on script exit traps").
+# over ("containers removed ... on script exit traps").
 cleanup_on_failure() {
   local ec=$?
   if [ "$ec" -ne 0 ]; then

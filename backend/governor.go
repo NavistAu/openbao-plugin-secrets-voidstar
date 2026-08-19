@@ -58,7 +58,7 @@ func (g *loopbackGovernor) recordResult(err error) {
 	g.nextAllowedAt = g.now().Add(loopbackBackoffDelay(g.consecutiveFailures))
 }
 
-// snapshot returns the read-only state Task 8's status endpoint will
+// snapshot returns the read-only state the admin/status endpoint will
 // surface ("init failure surfaces in status").
 func (g *loopbackGovernor) snapshot() (consecutiveFailures int, lastErr string) {
 	g.mu.Lock()
