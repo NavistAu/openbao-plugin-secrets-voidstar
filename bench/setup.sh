@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Task 9 bench gate: stand up a scratch OpenBao 2.5.5 server-mode
 # container, init/unseal it, register+mount voidstar and the dynfake
-# lease-emitting test plugin (docs/NOTES.md F5's mechanism, verbatim
+# lease-emitting test plugin (mechanism verbatim
 # down to the container/port cosmetics differing from the sibling's
 # 18200), seed KV v2 + KV v1 targets, wire the loopback AppRole
-# (docs/NOTES.md F1's contract: secret_id_num_uses=0, secret_id_ttl=0),
+# (contract: secret_id_num_uses=0, secret_id_ttl=0),
 # write vs/admin/config, and write every bench mapping (kv2 adapter,
 # raw adapter, #field select, structured whole-map, nested tree for
 # list, the dynfake lease-drill mapping). Does NOT run the drive

@@ -21,8 +21,8 @@ func doRequest(b *Backend, storage logical.Storage, op logical.Operation, path s
 // TestVerbMatrix_405 is the table-driven sweep over the spec §5 405
 // matrix: write verbs on data/* and metadata/*, and every verb
 // (including read/list) on the KV-reserved paths. Each must be an
-// explicitly-registered 405 naming voidstar (docs/NOTES.md F2 nuance
-// 4), not the SDK's generic unsupported-operation text.
+// explicitly-registered 405 naming voidstar, not the SDK's generic
+// unsupported-operation text.
 func TestVerbMatrix_405(t *testing.T) {
 	writeVerbs := []logical.Operation{logical.CreateOperation, logical.UpdateOperation, logical.PatchOperation, logical.DeleteOperation}
 	anyVerb := []logical.Operation{logical.CreateOperation, logical.ReadOperation, logical.UpdateOperation, logical.PatchOperation, logical.DeleteOperation, logical.ListOperation}

@@ -147,7 +147,7 @@ func customMetadata(cfg *Config, target string) map[string]interface{} {
 //     quarantine still applies). A RevokeLease failure is logged,
 //     recorded as the quarantine's revocation outcome, and recycles
 //     the loopback token (RevokeSelf, cascading to its child leases)
-//     plus invalidates the client for lazy re-login — docs/NOTES.md F1:
+//     plus invalidates the client for lazy re-login.
 //     RevokeLease succeeding is not evidence a lease existed
 //     (idempotent revoke), but a RevokeLease *error* is a genuine
 //     connectivity/permission failure worth reacting to.

@@ -30,7 +30,7 @@ func pathData(b *Backend) *framework.Path {
 			},
 			// Explicit 405s (spec §5: "any other verb on vs/data/* ...
 			// 405, error text naming voidstar as read-only") —
-			// docs/NOTES.md F2 nuance 4: must be registered, not left
+			// must be registered, not left
 			// unregistered, or the 405 body text is the SDK's generic
 			// one instead of this spec-mandated one.
 			logical.CreateOperation: path405("data/<view> is read-only"),

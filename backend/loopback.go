@@ -18,7 +18,7 @@ type LoopbackClient interface {
 	// lease fields spec §4's static-contract detection needs.
 	Read(ctx context.Context, path string) (data map[string]interface{}, leaseID string, renewable bool, err error)
 	// RevokeLease revokes leaseID (spec §4 mitigation 1,
-	// sys/leases/revoke). docs/NOTES.md F1: revoking an already-gone
+	// sys/leases/revoke). Revoking an already-gone
 	// lease ID does not error (idempotent revoke) — callers must not
 	// infer "there was nothing to revoke" from a nil error.
 	RevokeLease(ctx context.Context, leaseID string) error
@@ -33,7 +33,7 @@ type LoopbackClient interface {
 
 // errLoopbackTargetNotFound is returned by sdkLoopbackClient.Read when
 // the target path itself doesn't exist: the api/v2 client surfaces
-// that as (nil, nil), not an error (docs/NOTES.md F2's "implicit 404"
+// that as (nil, nil), not an error (the same "implicit 404"
 // behavior applies to the loopback read too), so it's turned into an
 // explicit error here rather than risking a nil-Secret panic
 // downstream.
@@ -41,7 +41,7 @@ var errLoopbackTargetNotFound = errors.New("voidstar: loopback target not found"
 
 // sdkLoopbackClient is the concrete LoopbackClient wrapping a real
 // api/v2 client already authenticated (newSDKLoopbackClient performs
-// the AppRole login at construction, docs/NOTES.md F1).
+// the AppRole login at construction).
 type sdkLoopbackClient struct {
 	client *api.Client
 }
@@ -49,10 +49,10 @@ type sdkLoopbackClient struct {
 var _ LoopbackClient = (*sdkLoopbackClient)(nil)
 
 // newSDKLoopbackClient builds a LoopbackClient by logging into cfg's
-// AppRole against cfg.APIAddr (docs/NOTES.md F1's exact recorded raw
+// AppRole against cfg.APIAddr (a raw
 // login call — api/v2 has no AppRole helper package) and returns it
 // along with the login's token TTL in seconds (SecretAuth.LeaseDuration
-// — F1: "this is the token TTL, not a lease_id") so the caller can seed
+// — this is the token TTL, not a lease_id) so the caller can seed
 // its renew-ahead-of-TTL tracking without a separate call.
 func newSDKLoopbackClient(ctx context.Context, cfg *Config) (LoopbackClient, int, error) {
 	apiCfg := api.DefaultConfig()
@@ -112,7 +112,7 @@ func (s *sdkLoopbackClient) RenewSelf(ctx context.Context) (int, error) {
 // "Any 403 or token-expiry on a loopback call invalidates the client
 // ... expiry is indistinguishable from revocation and both are
 // handled by the same re-auth path" — so a token-expiry manifests as a
-// 403 permission-denied response, docs/NOTES.md F1's revoke-self
+// 403 permission-denied response from the revoke-self
 // probe, and needs no separate classification). Handles both the real
 // api/v2 client's *api.ResponseError (a StatusCode field) and the
 // fake's *statusError (a StatusCode method) so the same classification

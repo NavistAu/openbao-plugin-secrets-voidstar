@@ -1,6 +1,6 @@
 // Command dynfake is a throwaway lease-emitting secrets engine, built
-// only for Task 9's mandatory bench lease/quarantine drill
-// (docs/PLAN.md Task 9): its "leaky" read path mints a real,
+// only for Task 9's mandatory bench lease/quarantine drill: its
+// "leaky" read path mints a real,
 // renewable lease via a *logical.Secret response, so the drive script
 // can exercise voidstar's static-contract detection, revocation, and
 // quarantine (spec §4) against a genuine minted lease over the real

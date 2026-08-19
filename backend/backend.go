@@ -1,6 +1,6 @@
 // Package backend implements the "voidstar" OpenBao secrets engine,
 // which serves read-only virtual views over pointers into other
-// mounts. See docs/SPEC.md for the full design.
+// mounts.
 package backend
 
 import (
@@ -90,7 +90,7 @@ func newBackend() *Backend {
 
 // backendPaths assembles the full Paths slice. Order matters:
 // framework routing is a first-match-wins linear scan with no
-// specificity tiebreaking (docs/NOTES.md F4) — more specific/literal
+// specificity tiebreaking — more specific/literal
 // patterns must be registered before general catch-alls. The admin
 // family and the KV-reserved paths are all mutually non-overlapping
 // literal prefixes (anchored full-path match — "metadata/*" cannot

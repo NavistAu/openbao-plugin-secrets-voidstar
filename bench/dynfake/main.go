@@ -1,6 +1,6 @@
 // dynfake's plugin-process boilerplate — identical in shape to
-// cmd/openbao-plugin-secrets-voidstar/main.go (docs/NOTES.md F5),
-// wired to this package's local factory instead of backend.Factory.
+// cmd/openbao-plugin-secrets-voidstar/main.go, wired to this
+// package's local factory instead of backend.Factory.
 package main
 
 import (

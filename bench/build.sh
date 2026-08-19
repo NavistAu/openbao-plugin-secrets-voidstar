@@ -3,7 +3,7 @@
 # throwaway dynfake lease-emitting test plugin for the bench container
 # (linux/arm64 — matches the arm64 Mac host's native docker platform;
 # swap GOARCH=amd64 on an amd64 host). Mirrors the sibling's
-# bench/build.sh (docs/NOTES.md F5).
+# bench/build.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

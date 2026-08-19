@@ -48,8 +48,8 @@ type FakeLoopbackClient struct {
 	ReadCalls int
 
 	// RevokeLeaseErr, keyed by lease ID, if set, fails that lease's
-	// RevokeLease call. Absent means success, matching docs/NOTES.md
-	// F1's idempotent-revoke behavior (a bogus/unscripted lease ID
+	// RevokeLease call. Absent means success, matching the real
+	// client's idempotent-revoke behavior (a bogus/unscripted lease ID
 	// revokes without error).
 	RevokeLeaseErr   map[string]error
 	RevokeLeaseCalls int

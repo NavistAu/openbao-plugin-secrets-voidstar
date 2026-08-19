@@ -1,158 +1,359 @@
 # openbao-plugin-secrets-voidstar
 
-A custom OpenBao secrets engine that serves read-only virtual views:
-paths under its mount hold no secret material of their own, only
-pointers ("mappings") to real paths in other mounts (KV v2, other
-static engines). Reading a view path dereferences the pointer
-server-side and returns the target's value. Secrets keep existing
-exactly once, at their canonical subject-organized path; consumers get
-a consumer-organized view onto them without copies, so N copies never
-means N rotation targets. Dereference is server-side, so every client
-(CI secret brokers, deploy-time resolvers, humans with the CLI) stays
-a dumb reader — no client anywhere contains resolution logic. `void*`:
-an untyped reference, meaningful only once dereferenced.
+[![CI](https://github.com/NavistAu/openbao-plugin-secrets-voidstar/actions/workflows/ci.yml/badge.svg)](https://github.com/NavistAu/openbao-plugin-secrets-voidstar/actions/workflows/ci.yml)
+[![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](LICENSE)
 
-Status: **implemented** — tasks 0–10 complete, bench gate PASS
-(2026-08-11).
+openbao-plugin-secrets-voidstar is an OpenBao secrets engine that serves
+read-only virtual views: paths under its mount hold no secret material of
+their own, only pointers ("mappings") to real paths in other mounts (KV v2,
+other static engines). Reading a view path dereferences the mapping
+server-side and returns the target's value — the client sees only the
+value, never the mapping or the target path. `void*` names the idea: an
+untyped reference, meaningful only once dereferenced.
 
 May work with HashiCorp Vault — untested, unsupported.
 
-## API surface
+## Value proposition
 
-Mounted at an operator-chosen path (`vs/` below). Read-only KV v2 wire
-shapes for raw API clients (`bao read`/`bao list`, HTTP clients) —
-the `bao kv` CLI does not identify a custom plugin mount as KV v2, so
-CLI compatibility is not claimed (spec §2).
+A secret's canonical copy lives at exactly one path, in whichever engine
+and shape best fits how it is produced or rotated. Every consumer that
+needs it under a different, consumer-organized path gets a view instead of
+a copy, so N consumers reading the same secret under N different paths
+never means N places to rotate it. Dereference happens server-side, so no
+client — a CI secret broker, a deploy-time resolver, a human with the
+CLI — ever contains resolution logic. Every client stays a dumb reader.
 
-**Consumer surface:**
+## Terms
 
-| Verb/path | Behavior |
+The domain reuses common OpenBao words for specific meanings. This table
+is the disambiguation.
+
+| Term | Meaning |
 |---|---|
-| `GET vs/data/<view>` | dereference; `{data: {data: <map>, metadata: <synthetic>}}` |
-| `GET vs/metadata/<view>` | synthetic metadata document (`current_version`/`oldest_version` 1, `versions`, `custom_metadata`) |
-| `LIST vs/metadata/<prefix>` | synthesized from mapping keys: direct children only, dir suffix `/`, sorted; empty → 404 |
-| POST/PUT/PATCH/DELETE on `vs/data/*` or `vs/metadata/*` | 405, error text naming voidstar as read-only |
-| any verb, including GET, on `vs/config`, `vs/delete/*`, `vs/undelete/*`, `vs/destroy/*`, `vs/detailed-metadata/*` | 405, same error (KV-reserved paths; `vs/config` is deliberately not the KV config endpoint) |
-| anything else under the mount, excluding `vs/admin/*` | 404 |
+| view | A path under voidstar's mount that a consumer reads. A view holds no secret material — only a mapping. |
+| mapping | The stored pointer behind a view. A mapping records a target, an optional adapter override, and quarantine state. |
+| target | The canonical `<mount>/<path>[#field]` string a mapping points to. A target names the real location voidstar dereferences. |
+| mount | An OpenBao secrets engine mount point. voidstar's own mount (`vs/` in this document's examples) differs from a target's mount. A target's mount is wherever voidstar reads the real value from. |
 
-**Admin surface** (separate path family, separate grants):
+## How it works
 
-```
-GET/POST/DELETE vs/admin/map/<view>    mapping CRUD; POST body
-                                        {target: "...", adapter: "kv2|raw"}
-LIST            vs/admin/map/<prefix>  enumerate mappings
-GET/POST        vs/admin/config        engine config (spec §8)
-GET             vs/admin/status        loopback client state, mapping
-                                        count, failure counters keyed by
-                                        target mount, quarantined
-                                        mappings; no secret material
+```mermaid
+flowchart LR
+    A[client reads a view path] --> B[mapping lookup]
+    B --> C[server-side dereference]
+    C --> D[target mount]
+    D --> E[value returned to client]
 ```
 
-Target canonicalization, adapters (`kv2`/`raw`), `#field` selection,
-lease/quarantine mechanics, and the full error table are enforced by
-the engine's test suite (`backend/`).
+A read of `vs/data/<view>` looks up `<view>`'s mapping in voidstar's own
+storage. The mapping names a target. voidstar performs the target read
+itself, over its own loopback connection to the OpenBao instance it is
+mounted in. The target's value comes back through voidstar and out to the
+client in KV v2 data-read shape. The client never contacts the target
+mount directly and never sees the target path.
 
-## Deployment: loopback AppRole contract
+## When to use it
 
-voidstar authenticates to its own OpenBao instance via AppRole to
-perform dereference reads. Two properties are load-bearing and must
-hold at the estate layer, not just in engine code:
+Use voidstar when several consumers need the same secret organized under
+different, consumer-specific paths, and you want one canonical copy with
+disposable, revocable views onto it instead of duplicated values. Use it
+when you want dereference to run once, server-side, so no client needs
+resolution logic of its own.
 
-- **SecretID must be multi-use and non-expiring**
-  (`secret_id_num_uses=0`, `secret_id_ttl=0`). The engine re-logs-in
-  with the stored SecretID lazily on any 403/token-expiry, including
-  after a process restart at any point in the SecretID's life —
-  single-use or TTL'd SecretIDs break that restart recovery
-  permanently and must not be issued to this engine (spec §4).
-- **Policy = the mapped target set, plus one fixed grant.** The
-  engine's own policy is derived from the mapping by the same IaC
-  that writes the mapping — read on exactly the target paths that
-  appear in `vs/admin/map/*`, no more — plus `sys/leases/revoke`
-  (the one fixed, non-derived grant, used only for the static-contract
-  cleanup path). Token self-renewal and `auth/token/revoke-self` need
-  no extra grant — they ride the `default` policy every token
-  carries. Grant and mapping cannot drift because the same tofu run
-  produces both (spec §4 mitigation 2).
+## When not to use it
 
-Rotating the loopback SecretID is a config rewrite
-(`POST vs/admin/config`) — write-only, never readable back.
+Do not rely on `bao kv` CLI compatibility. The CLI does not recognize a
+custom plugin mount as KV v2, so only the raw wire shape is
+compatible — use `bao read`/`bao list` or an HTTP client instead. Do not
+use voidstar for anything that needs write access through a view — every
+write goes through the admin surface's mapping calls, or the target's own
+mount, never through `data/<view>`. Do not point a mapping at a target
+whose engine issues leases on read — voidstar's static-contract detection
+quarantines any view whose target starts returning a lease.
 
-## Bench record
+## Requirements
 
-Task 9 bench gate run 2026-08-11. Local: scratch
-`ghcr.io/openbao/openbao:2.5.5` container (`vs-bench`), server mode
-(file storage, `bench/config/bao.hcl`), both plugins cross-compiled
-`linux/arm64` (`bench/build.sh`):
+voidstar is built against `github.com/openbao/openbao/sdk/v2` v2.6.2 and
+`github.com/openbao/openbao/api/v2` v2.6.0 (see `go.mod`). Run it against
+an OpenBao server compatible with that SDK/API generation. Building from
+source needs Go 1.25 (see `mise.toml`).
 
-- `openbao-plugin-secrets-voidstar` registered as catalog name `vs`,
-  mounted at `vs/`, sha256
-  `fc01d20b250f1f075c59ac9a4ba93109e7cc9853f70dbfee438c2052b4ca0e81`.
-- `dynfake` (throwaway lease-emitting test plugin, `bench/dynfake/`)
-  registered as catalog name `dynfake`, mounted at `dynfake/`, sha256
-  `a0f4ede602f91babf3b6badfd1e31f3605e2c63808e87bc5320a25d7b83a3639`.
+## Installation
 
-Targets: `kv/` (kv-v2, seeded `simple`/`structured`/`tree/{a,b,nested/c}`),
-`kv1/` (kv v1, seeded `raw-item`). Loopback AppRole `vs-loopback`
-(`secret_id_num_uses=0`, `secret_id_ttl=0` per spec §4's restart-
-recovery contract) with a policy granting read on `kv/data/*`,
-`kv1/*`, `dynfake/leaky`, and update+sudo on `sys/leases/revoke`.
-Eight mappings written under `vs/admin/map/team/...` covering the kv2
-adapter (whole map), structured whole-map, `#field` select, the raw
-adapter (explicit override, kv v1 target), the nested tree (list
-sweep), and the dynfake lease-drill target. Scripts: `bench/build.sh`,
-`bench/setup.sh`, `bench/run.sh` (drives `bench/drive`, a Go program
-issuing real HTTP reads via the api/v2 client — no backend-internal
-calls), `bench/cleanup.sh`.
+### From a release tarball
 
-### Overall verdict: **PASS**
+Download the tarball and its checksum for your platform, verify the
+checksum, and extract the binary.
 
-No engine bug found. (Two bugs were found and fixed in the bench
-harness itself — `bench/drive/main.go` — before this recorded run: the
-api/v2 client decodes JSON numbers as `json.Number` not `float64`, and
-a clean 404 `Read`/`List` response returns `(nil, nil)`, not a Go
-error carrying status 404. Neither touched `backend/`.)
+```sh
+VERSION=0.1.0
+ARCH=amd64   # or arm64
+curl -LO "https://github.com/NavistAu/openbao-plugin-secrets-voidstar/releases/download/v${VERSION}/openbao-plugin-secrets-voidstar_${VERSION}_linux_${ARCH}.tar.gz"
+curl -LO "https://github.com/NavistAu/openbao-plugin-secrets-voidstar/releases/download/v${VERSION}/openbao-plugin-secrets-voidstar_${VERSION}_linux_${ARCH}.tar.gz.sha256"
+sha256sum -c "openbao-plugin-secrets-voidstar_${VERSION}_linux_${ARCH}.tar.gz.sha256"
+tar -xzf "openbao-plugin-secrets-voidstar_${VERSION}_linux_${ARCH}.tar.gz"
+```
 
-| # | Assertion group | Verdict | Notes |
+### From source
+
+Clone the repository and build the plugin binary with Go 1.25.
+
+```sh
+git clone https://github.com/NavistAu/openbao-plugin-secrets-voidstar.git
+cd openbao-plugin-secrets-voidstar
+mise exec -- go build -o openbao-plugin-secrets-voidstar ./cmd/openbao-plugin-secrets-voidstar
+```
+
+### Register and mount
+
+Copy the binary into the server's plugin directory, then register it by
+its checksum and mount it.
+
+```sh
+SHA256=$(sha256sum openbao-plugin-secrets-voidstar | cut -d ' ' -f1)
+bao plugin register -sha256="$SHA256" -command=openbao-plugin-secrets-voidstar secret vs
+bao secrets enable -path=vs vs
+```
+
+Configure the engine once it is mounted (see Configuration reference
+below):
+
+```sh
+bao write vs/admin/config \
+  role_id=<approle-role-id> \
+  secret_id=<approle-secret-id> \
+  api_addr=https://127.0.0.1:8200
+```
+
+## Configuration reference
+
+Every path voidstar registers, and every field its writable paths accept.
+`<mount>` is the path voidstar is mounted at (`vs/` in the examples
+above).
+
+### Consumer surface
+
+| Path | Verb | Behavior |
+|---|---|---|
+| `<mount>/data/<view>` | GET | Dereferences `<view>` and returns `{data: {data: <target value>, metadata: <synthetic>}}`. |
+| `<mount>/data/<view>` | POST, PUT, PATCH, DELETE | 405: voidstar is read-only. |
+| `<mount>/metadata/<view>` | GET | Returns a synthetic KV v2 metadata document for `<view>`. |
+| `<mount>/metadata/<prefix>` | LIST | Lists direct children of `<prefix>` from the mapping keys, sorted, directories suffixed `/`. An empty result is a 404. |
+| `<mount>/metadata/<view>` | POST, PUT, PATCH, DELETE | 405: voidstar is read-only. |
+| `<mount>/config` | any verb, including GET | 405: not the KV config endpoint. Engine config lives at `<mount>/admin/config`. |
+| `<mount>/delete/<view>` | any verb, including GET | 405: voidstar has no delete semantics. |
+| `<mount>/undelete/<view>` | any verb, including GET | 405: voidstar has no undelete semantics. |
+| `<mount>/destroy/<view>` | any verb, including GET | 405: voidstar has no destroy semantics. |
+| `<mount>/detailed-metadata/<view>` | any verb, including GET | 405: voidstar has no detailed-metadata semantics. |
+| anything else, excluding `<mount>/admin/*` | any verb | 404. |
+
+### Admin surface
+
+A separate path family from the consumer surface — grant read/write on it
+separately.
+
+| Path | Verb | Effect |
+|---|---|---|
+| `<mount>/admin/map/<view>` | GET | Reads the mapping entry for `<view>`. |
+| `<mount>/admin/map/<view>` | POST | Creates or replaces the mapping entry for `<view>`. Clears any existing quarantine. |
+| `<mount>/admin/map/<view>` | DELETE | Deletes the mapping entry for `<view>`. |
+| `<mount>/admin/map/<prefix>` | LIST | Enumerates mapping keys under `<prefix>`. |
+| `<mount>/admin/config` | GET | Reads the engine configuration. Omits `secret_id`. |
+| `<mount>/admin/config` | POST | Replaces the engine configuration wholesale — every write requires `role_id`, `secret_id`, and `api_addr`. |
+| `<mount>/admin/status` | GET | Reads loopback client health, mapping count, failure counters, and quarantined mappings. Returns no secret material. |
+
+### Mapping fields (`POST <mount>/admin/map/<view>`)
+
+| Field | Type | Default | Effect |
 |---|---|---|---|
-| 1 | Data reads (kv2 whole-map, structured whole-map, `#field` select, raw adapter) | PASS | All four views returned exact expected values in KV v2 data-read shape (`{data: {...}, metadata: {...}}`) |
-| 2 | Metadata read | PASS | `GET vs/metadata/team/simple` matched spec §5's synthetic document exactly: `current_version`/`oldest_version` 1, `max_versions` 0, `created_time`==`updated_time`, `versions["1"]` present, `custom_metadata: {}` (expose_targets=false) |
-| 3 | List sweep | PASS | `LIST vs/metadata/team/tree` returned `[a, b, nested/]` — direct children only, dir suffix, sorted |
-| 4 | 404 unmapped | PASS | `GET vs/data/team/nope` → 404 |
-| 5 | 405 matrix (spot checks) | PASS | `POST vs/data/team/simple` → 405 with voidstar read-only text; `GET vs/config` → 405 with voidstar-specific "not the KV config endpoint" text |
-| 6 | **Lease/quarantine drill (mandatory)** | PASS | First `GET vs/data/team/dynfake` minted a real lease on `dynfake` (dynfake's read counter 0→1, proving a genuine loopback read happened, not a fake), voidstar detected the static-contract violation and returned 502; `vs/admin/status` showed `team/dynfake` quarantined with `revocation_outcome: revoked`; `LIST sys/leases/lookup/dynfake/leaky` returned 404 (no active lease) — the real `sys/leases/revoke` path proven live; a second read fast-failed 502 (`view quarantined`) with dynfake's counter unchanged at 1, proving no second loopback call occurred |
+| `target` | string | none (required) | Canonical target the view points to: `<mount>/<path>[#field]`. Rejected if URL-encoded, if it has a query string, a `.` or `..` segment, a leading, trailing, or repeated slash, more than one `#field` suffix, or fewer than two path segments. Also rejected if its mount is `auth`, `sys`, `identity`, `cubbyhole`, voidstar's own mount, or absent from a configured `target_mount_allowlist`. |
+| `adapter` | string | `""` (auto-detect) | Overrides adapter selection. `""` picks `kv2` when the target's second path segment is `data`, else `raw`. The only other valid values are `kv2` and `raw`. |
 
-Full transcript: `bench/scratch/setup-output.txt`, `bench/scratch/drive-output.txt` (scratch, gitignored, not committed).
+### Config fields (`POST <mount>/admin/config`)
 
-## Release and estate pin
+| Field | Type | Default | Effect |
+|---|---|---|---|
+| `approle_mount` | string | `approle` | Auth mount voidstar logs into for its loopback AppRole. |
+| `role_id` | string | none (required) | Loopback AppRole `role_id`. |
+| `secret_id` | string | none (required) | Loopback AppRole `secret_id`. Write-only — never returned on read. Must be issued with `secret_id_num_uses=0` and `secret_id_ttl=0` (see Design constraints). |
+| `api_addr` | string | none (required) | Address voidstar dereferences targets against. |
+| `expose_targets` | bool | `false` | Includes the target mount name in synthetic metadata and error responses when `true`. |
+| `target_mount_allowlist` | comma-separated string list | unset (every mount permitted) | Restricts mapping targets to these exact mount names. Fixed rejects (`auth`, `sys`, `identity`, `cubbyhole`, voidstar's own mount) apply regardless. |
 
-Tags matching `v*` trigger the Woodpecker release job (below):
-cross-compiled `linux_amd64`/`linux_arm64` tarballs plus a
-`SHA256SUMS` file, published to a forge release
-(`tea releases create --repo <org>/openbao-plugin-secrets-voidstar`,
-`forgejo_token` secret, tag-scoped). The estate installs by checksum,
-not by tag alone: the consuming service (in the estate's
-infrastructure repo) pins an exact plugin version + release URL in
-`vars/main.yaml`, downloads the release tarball, and verifies its
-SHA256 against `SHA256SUMS` before the binary reaches the plugin
-directory — the same checksum-pinned-artifact pattern used for every
-other estate-installed binary. Bumping the estate pin is a
-`vars/main.yaml` edit in the estate repo, not a push here.
+## Errors and logs
+
+### Dereference failure classes
+
+Returned as `voidstar: <message> for view "<view>"`, with
+`(target mount "<mount>")` appended only when `expose_targets=true`.
+
+| Failure class | Message | HTTP status |
+|---|---|---|
+| upstream_read_failure | `upstream dereference failed` | 502 |
+| missing_field | `target field not found` | 502 |
+| lease_violation | `static-contract violation` | 502 |
+| quarantined_fastfail | `view quarantined` | 502 |
+
+### Other request errors
+
+| Situation | Message | HTTP status |
+|---|---|---|
+| No mapping for a `data`/`metadata` read | `voidstar: no mapping for view "<view>"` | 404 |
+| Empty `metadata` list result | `voidstar: no views under prefix "<prefix>"` | 404 |
+| Unmatched path (catch-all) | `voidstar: "<path>" not found` | 404 |
+| Write verb on `data/<view>` or `metadata/<view>` | `voidstar: read-only secrets engine; <path> is read-only` | 405 |
+| Any verb on a KV-reserved path | `voidstar: read-only secrets engine; <reason>` | 405 |
+| kv2-adapter target missing its `data.data` envelope | `voidstar: kv2 adapter: response missing data.data envelope` | 502 |
+
+### Mapping and config write validation
+
+Returned as an error response body, no fixed HTTP status beyond the
+SDK's default for a validation failure.
+
+| Cause | Message |
+|---|---|
+| `role_id` empty | `role_id is required` |
+| `secret_id` empty | `secret_id is required` |
+| `api_addr` empty | `api_addr is required` |
+| `view` empty on a map write | `view path is required` |
+| `adapter` not `""`, `kv2`, or `raw` | `adapter "<value>" must be "kv2" or "raw"` |
+| `target` empty | `target is required` |
+| `target` URL-encoded | `target must not be URL-encoded` |
+| `target` has a query string | `target must not contain a query string` |
+| `target` has zero or more than one non-empty `#field` suffix | `target must have exactly one non-empty #field suffix` |
+| `target` has fewer than two path segments | `target must be <mount>/<path>` |
+| `target` has a leading, trailing, or repeated slash | `target must not have a leading slash, trailing slash, or repeated slashes` |
+| `target` has a `.` or `..` segment | `target must not contain . or .. segments` |
+| `target`'s mount is voidstar's own mount | `target must not reference the engine's own mount` |
+| `target`'s mount is rejected or not allowlisted | `target mount "<mount>" is not permitted` |
+
+### Operator-side log lines
+
+Logged at `Warn`, unredacted — these are operator-facing, not
+consumer-facing.
+
+| Event | Fields |
+|---|---|
+| `voidstar: dereference failed` | `view`, `target_mount`, `cause` |
+| `voidstar: lease revocation failed, recycling loopback token` | `view`, `target_mount`, `error` |
+| `voidstar: loopback token self-revoke also failed` | `view`, `target_mount`, `error` |
+| `voidstar: failed to persist quarantine` | `view`, `target_mount`, `error` |
+
+## Troubleshooting
+
+**`GET <mount>/data/<view>` returns 404.** No mapping exists for
+`<view>`. Confirm with `bao read <mount>/admin/map/<view>`. Write a
+mapping before reading the view.
+
+**`GET <mount>/data/<view>` returns 502 `view quarantined`.** A prior
+read found the target violating the static contract (it returned a
+lease). Check `bao read <mount>/admin/status` for `quarantined_mappings`
+and its `quarantine_cause`. Fix the target so it stops issuing a lease,
+then rewrite the mapping to clear quarantine.
+
+**`GET <mount>/data/<view>` returns 502 `upstream dereference failed`.**
+The loopback read to the target failed. Check
+`bao read <mount>/admin/status` for `loopback.client_connected` and
+`loopback.init_last_error`. Verify `role_id`, `secret_id`, and
+`api_addr` in `<mount>/admin/config`, and that the AppRole's `secret_id`
+has `secret_id_num_uses=0` and `secret_id_ttl=0`.
+
+**`GET <mount>/data/<view>` returns 502 `target field not found`.** The
+mapping's `#field` suffix names a key absent from the target's data.
+Read the target directly and correct the mapping.
+
+**Plugin registration fails.** Confirm the `-sha256` value matches the
+binary exactly: `sha256sum openbao-plugin-secrets-voidstar`. OpenBao
+rejects a catalog entry whose checksum does not match.
+
+**`<mount>/admin/status` shows `client_connected: false`.** The loopback
+AppRole login has not yet succeeded. Check `init_last_error` and
+`init_consecutive_failures` in the same response — voidstar retries
+construction with exponential backoff, capped at five minutes between
+attempts.
+
+## Design constraints
+
+These constraints are enforced by the code, not just documented:
+
+- **Read-only, explicitly.** The consumer surface (`data/*`,
+  `metadata/*`) never accepts a write. Write verbs are registered with
+  an explicit 405 naming voidstar, rather than left unregistered, so the
+  error text is voidstar's own rather than the SDK's generic one
+  (`backend/paths_405.go`).
+- **KV-reserved paths always 405.** `config`, `delete/*`, `undelete/*`,
+  `destroy/*`, and `detailed-metadata/*` are 405 for every verb,
+  including GET — voidstar deliberately does not implement KV v2's
+  config/delete/undelete/destroy semantics. `<mount>/config` is not the
+  KV config endpoint; engine configuration lives at
+  `<mount>/admin/config` (`backend/paths_reserved.go`).
+  The catch-all 404 covers anything else unregistered under the mount,
+  excluding the `admin/*` family (`backend/paths_notfound.go`).
+- **Dereference is server-side only.** voidstar performs the target read
+  itself, over its own loopback connection. No client-side resolution
+  logic exists or is needed.
+  (`backend/dereference.go`).
+- **Static-contract enforcement.** Every target read is expected to
+  return a value with no lease and no renewable flag. A response
+  carrying either violates the contract: voidstar revokes what it can
+  (`sys/leases/revoke`, falling back to revoking its own loopback token
+  on a revoke failure), quarantines the mapping so every subsequent read
+  fast-fails with a 502 and no loopback call, and fails the triggering
+  read with the same 502. Only rewriting the mapping clears quarantine
+  (`backend/dereference.go`, `checkStaticContract`).
+- **Loopback authentication contract.** The AppRole `secret_id` must be
+  multi-use and non-expiring (`secret_id_num_uses=0`,
+  `secret_id_ttl=0`). voidstar performs lazy re-login on any 403 or
+  token-expiry from a loopback call, including after a process restart
+  at any point in the `secret_id`'s life — a single-use or TTL'd
+  `secret_id` breaks that restart recovery permanently
+  (`backend/loopback.go`).
+- **Target canonicalization.** Target strings are opaque and validated
+  against a fixed grammar; `auth`, `sys`, `identity`, `cubbyhole`, and
+  voidstar's own mount are always rejected as targets, regardless of any
+  configured `target_mount_allowlist` (`backend/mapping.go`,
+  `backend/config.go`).
+- **Secret confidentiality.** A mapping never stores a target's secret
+  value — only its target string, adapter override, write time, and
+  quarantine state. Target secret values are never logged. Only the
+  target mount name is logged (unconditionally, operator-side) and
+  reaches a consumer-visible error or metadata response only when
+  `expose_targets=true`.
+
+## Tests
+
+`backend/` is the authoritative test suite — it exercises every path,
+verb, and failure class through the framework's request/response layer
+against a scripted `FakeLoopbackClient`, with no network and no real
+OpenBao server:
+
+```sh
+mise exec -- go test ./...
+```
+
+`bench/` is a separate, manual drill against a real OpenBao server and a
+throwaway lease-emitting test plugin. It exists because the static-contract
+detection and quarantine path need a genuine minted lease on the wire —
+something a scripted fake cannot produce — to prove real. It is not part
+of CI and does not run automatically; see the scripts under `bench/` to
+run it by hand.
 
 ## CI
 
-Woodpecker (the forge's CI, `.woodpecker.yml`): `go build
-./...` + `go test -race ./...` on push/PR/manual; tagged releases
-(`v*`) build the cross-platform artifacts and publish them to the
-forge with checksums, per Release above. Registered 2026-08-11; push
-pipeline green (run 1) and tag release path validated same day —
-v0.1.0 published (run 13) with both tarballs + SHA256SUMS after four
-real CI defects were fixed at the gate: Woodpecker config-time
-substitution mangling artifact names, its parser rejecting
-escaped/commented dollar-brace forms, a read-scoped forge token
-(release create 404), and a greedy release-id parse uploading to the
-wrong release. Release logic lives in ci/release.sh (create-or-lookup,
-idempotent) for exactly these reasons.
+GitHub Actions runs `go vet` and `go test -race ./...` on every push and
+pull request. A private-forge Woodpecker CI also runs the same build and
+test suite on every push.
+
+## Contributing
+
+Contributions are welcome. Open an issue to discuss a change before
+sending a pull request for anything beyond a small fix.
+
+## Security
+
+Report a suspected vulnerability through GitHub's private security
+advisories for this repository rather than a public issue.
 
 ## License
 
-MPL-2.0. See `LICENSE`.
+MPL-2.0. See [LICENSE](LICENSE).

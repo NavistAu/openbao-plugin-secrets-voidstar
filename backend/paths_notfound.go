@@ -7,7 +7,7 @@ import (
 
 // pathNotFound is the spec §5 catch-all: "anything else on the KV-
 // emulation surface ... 404." It must be registered LAST in the
-// backend's Paths slice (docs/NOTES.md F4: routing is a first-match-
+// backend's Paths slice (routing is a first-match-
 // wins linear scan) — every other pattern this backend registers
 // (admin/config, admin/map/*, data/*, metadata/*, and the KV-reserved
 // paths) is tried first, so this only ever fires for a request that

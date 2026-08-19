@@ -2,7 +2,7 @@
 // the scratch vs-bench server (bench/setup.sh already wrote config +
 // every mapping) with real HTTP reads via the api/v2 client — no
 // backend-internal calls, no fakes — and checks every behavior
-// docs/PLAN.md Task 9 requires, printing PASS/FAIL per assertion
+// Task 9 requires, printing PASS/FAIL per assertion
 // group. Exits non-zero if anything failed.
 package main
 
@@ -235,7 +235,7 @@ func notFound(c *api.Client) {
 	const group = "404-unmapped"
 	// api/v2's Logical().Read special-cases 404 responses whose body
 	// doesn't carry warnings/data (exactly voidstar's {"errors":[...]}
-	// shape, docs/NOTES.md F2) into (nil secret, nil error) rather than
+	// shape) into (nil secret, nil error) rather than
 	// surfacing it as a Go error — so a clean 404 here is secret==nil,
 	// err==nil, not an *api.ResponseError.
 	secret, err := c.Logical().Read("vs/data/team/nope")
