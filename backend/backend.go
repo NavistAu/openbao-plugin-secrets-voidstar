@@ -101,6 +101,7 @@ func backendPaths(b *Backend) []*framework.Path {
 	paths := []*framework.Path{
 		pathConfig(b),
 		pathMap(b),
+		pathLevel(b),
 		pathStatus(b),
 		pathData(b),
 		pathMetadata(b),
