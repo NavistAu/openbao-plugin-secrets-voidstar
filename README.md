@@ -163,6 +163,7 @@ above).
 | `<mount>/data/<view>` | GET | Dereferences `<view>` and returns `{data: {data: <target value>, metadata: <synthetic>}}`. |
 | `<mount>/data/<view>` | POST, PUT, PATCH, DELETE | 405: voidstar is read-only. |
 | `<mount>/metadata/<view>` | GET | Returns a synthetic KV v2 metadata document for `<view>`. |
+| `<mount>/metadata/<prefix>/` (trailing slash) | GET | Returns `{custom_metadata, created_time, updated_time}` for the level metadata set at `<prefix>` (see below), or 404 if none. |
 | `<mount>/metadata/<prefix>` | LIST | Lists direct children of `<prefix>` from the mapping keys, sorted, directories suffixed `/`. An empty result is a 404. |
 | `<mount>/metadata/<view>` | POST, PUT, PATCH, DELETE | 405: voidstar is read-only. |
 | `<mount>/config` | any verb, including GET | 405: not the KV config endpoint. Engine config lives at `<mount>/admin/config`. |
@@ -183,6 +184,7 @@ separately.
 | `<mount>/admin/map/<view>` | POST | Creates or replaces the mapping entry for `<view>`. Clears any existing quarantine. |
 | `<mount>/admin/map/<view>` | DELETE | Deletes the mapping entry for `<view>`. |
 | `<mount>/admin/map/<prefix>` | LIST | Enumerates mapping keys under `<prefix>`. |
+| `<mount>/admin/level/<prefix>` | GET, POST, DELETE, LIST | Manages level metadata: `custom_metadata` attached to a path prefix. The prefix is normalised to one trailing `/` (`a/b` and `a/b/` are the same level). POST accepts only `custom_metadata`; unknown fields are 400. |
 | `<mount>/admin/config` | GET | Reads the engine configuration. Omits `secret_id`. |
 | `<mount>/admin/config` | POST | Replaces the engine configuration wholesale — every write requires `role_id`, `secret_id`, and `api_addr`. |
 | `<mount>/admin/status` | GET | Reads loopback client health, mapping count, failure counters, and quarantined mappings. Returns no secret material. |
@@ -193,6 +195,26 @@ separately.
 |---|---|---|---|
 | `target` | string | none (required) | Canonical target the view points to: `<mount>/<path>[#field]`. Rejected if URL-encoded, if it has a query string, a `.` or `..` segment, a leading, trailing, or repeated slash, more than one `#field` suffix, or fewer than two path segments. Also rejected if its mount is `auth`, `sys`, `identity`, `cubbyhole`, voidstar's own mount, or absent from a configured `target_mount_allowlist`. |
 | `adapter` | string | `""` (auto-detect) | Overrides adapter selection. `""` picks `kv2` when the target's second path segment is `data`, else `raw`. The only other valid values are `kv2` and `raw`. |
+| `mode` | string | `fetch` | `fetch` dereferences the target (as above). `resolve` returns the target path and never calls the target. `metadata` has no target and exists to carry `custom_metadata`. |
+| `custom_metadata` | map string to string | none | Returned as the view's `custom_metadata` on every data and metadata read (KV v2 limits: at most 64 keys, key at most 128 bytes, value at most 512 bytes; key `voidstar_target` is reserved). The upstream target's own metadata is never copied. A rewrite replaces the map; omitting it clears it. |
+
+Any field not listed is rejected: the write returns 400 `unknown field(s): <sorted names>`.
+`target` is required for `fetch` and `resolve` and must be absent for `metadata`; `adapter` is valid only with `fetch`; a `resolve` target may not carry a `#field`.
+
+### Modes and the response contract
+
+Data reads (`GET <mount>/data/<view>`) by mode:
+
+- `fetch`: as before. `metadata.custom_metadata` is the mapping's own map (plus `voidstar_target` with `expose_targets`). No `voidstar` key, so a fetch view and a plain KV v2 response look the same to a client.
+- `resolve`: 200, `data: {}`, `metadata.custom_metadata` as above, and a top-level sibling `voidstar: {"mode": "resolve", "path": "<target path>"}`. No loopback call, no lease, no quarantine logic. The client reads `path` itself with its own token.
+- `metadata`: 200, `data: {}`, `metadata.custom_metadata` as above, `voidstar: {"mode": "metadata"}`.
+
+`GET <mount>/metadata/<view>` returns the mapping's `custom_metadata` for every mode, and `LIST` lists these views like any other.
+
+### Level metadata
+
+`POST <mount>/admin/level/<prefix>` with `{"custom_metadata": {...}}` (same limits) attaches metadata to a prefix. `GET <mount>/metadata/<prefix>/` returns it (404 when none); `LIST` on the same path is unaffected. A level need not have any views under it.
+
 
 ### Config fields (`POST <mount>/admin/config`)
 
@@ -242,7 +264,13 @@ SDK's default for a validation failure.
 | `api_addr` empty | `api_addr is required` |
 | `view` empty on a map write | `view path is required` |
 | `adapter` not `""`, `kv2`, or `raw` | `adapter "<value>" must be "kv2" or "raw"` |
-| `target` empty | `target is required` |
+| `target` empty (fetch/resolve) | `target is required` |
+| unknown field(s) on a map or level write | `unknown field(s): <sorted names>` |
+| `custom_metadata` over a limit or using `voidstar_target` | `custom_metadata ...` (names the limit or the reserved key) |
+| `mode` not `fetch`, `resolve`, or `metadata` | `mode "<value>" must be "fetch", "resolve" or "metadata"` |
+| `target` present with `mode=metadata` | `target must be absent for mode "metadata"` |
+| `adapter` with a non-fetch mode | `adapter is only valid with mode "fetch"` |
+| `#field` on a resolve target | `a #field suffix is not allowed on a resolve target` |
 | `target` URL-encoded | `target must not be URL-encoded` |
 | `target` has a query string | `target must not contain a query string` |
 | `target` has zero or more than one non-empty `#field` suffix | `target must have exactly one non-empty #field suffix` |
@@ -355,6 +383,11 @@ OpenBao server:
 ```sh
 mise exec -- go test ./...
 ```
+
+`test/grant/run.sh` is an integration run on a throwaway OpenBao (docker,
+plus a Postgres for the `database` engine): it builds the plugin, exercises
+the modes, custom metadata, level metadata and a templated discovery policy,
+then removes its containers. Needs docker, curl and jq.
 
 `bench/` is a separate, manual drill against a real OpenBao server and a
 throwaway lease-emitting test plugin. It exists because the static-contract
