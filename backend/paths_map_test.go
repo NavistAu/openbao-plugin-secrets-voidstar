@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -416,5 +417,35 @@ func TestPathMap_RewriteClearsQuarantine(t *testing.T) {
 	}
 	if got.Data["revocation_outcome"] != "" {
 		t.Errorf("revocation_outcome = %v, want empty after rewrite", got.Data["revocation_outcome"])
+	}
+}
+
+func TestPathMap_RejectsUnknownFields(t *testing.T) {
+	b, storage := newTestBackend(t)
+	resp, err := writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "zeta": 1, "foo": 1})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp == nil || !resp.IsError() || !strings.Contains(resp.Error().Error(), "unknown field(s): foo, zeta") {
+		t.Fatalf("resp = %+v, want 400 naming foo, zeta", resp)
+	}
+	if r, _ := readMapping(t, b, storage, "v"); r != nil {
+		t.Fatal("rejected write must not persist")
+	}
+}
+
+func TestPathMap_CustomMetadataRejectedUntilSupported(t *testing.T) {
+	b, storage := newTestBackend(t)
+	resp, _ := writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": map[string]interface{}{"a": "b"}})
+	if resp == nil || !resp.IsError() {
+		t.Fatalf("resp = %+v, want error", resp)
+	}
+}
+
+func TestPathMap_TargetAdapterOnlyStill200(t *testing.T) {
+	b, storage := newTestBackend(t)
+	resp, err := writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "adapter": "kv2"})
+	if err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("resp=%+v err=%v", resp, err)
 	}
 }

@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -80,6 +81,10 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 		return logical.ErrorResponse("view path is required"), nil
 	}
 
+	if msg := unknownFields(data); msg != "" {
+		return logical.ErrorResponse(msg), nil
+	}
+
 	target := data.Get("target").(string)
 	adapter := data.Get("adapter").(string)
 	if !validAdapterOverride(adapter) {
@@ -135,6 +140,22 @@ func (b *Backend) pathMapList(ctx context.Context, req *logical.Request, data *f
 		return nil, err
 	}
 	return logical.ListResponse(keys), nil
+}
+
+// unknownFields returns a 400 message naming every posted field that is
+// not in the path's schema (sorted), or "" when all are known.
+func unknownFields(data *framework.FieldData) string {
+	var bad []string
+	for k := range data.Raw {
+		if _, ok := data.Schema[k]; !ok {
+			bad = append(bad, k)
+		}
+	}
+	if len(bad) == 0 {
+		return ""
+	}
+	sort.Strings(bad)
+	return "unknown field(s): " + strings.Join(bad, ", ")
 }
 
 // getMappingFromStorage reads view's mapping entry fresh from storage,
