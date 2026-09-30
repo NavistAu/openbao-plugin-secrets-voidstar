@@ -29,6 +29,10 @@ type MappingEntry struct {
 	// Adapter overrides shape-based adapter selection:
 	// "" (auto-detect), "kv2", or "raw".
 	Adapter string `json:"adapter,omitempty"`
+	// Mode is "" or "fetch" (dereference the target), "resolve" (return
+	// the target path, never call it) or "metadata" (no target; carries
+	// custom_metadata only).
+	Mode string `json:"mode,omitempty"`
 	// CustomMetadata is the mapping's own string map, returned as the
 	// view's synthetic custom_metadata. Upstream metadata is never copied.
 	CustomMetadata map[string]string `json:"custom_metadata,omitempty"`
@@ -46,6 +50,21 @@ type MappingEntry struct {
 	// attempt that led to this quarantine (e.g.
 	// "revoked", "revoke failed, token recycled").
 	RevocationOutcome string `json:"revocation_outcome,omitempty"`
+}
+
+// Mapping modes.
+const (
+	modeFetch    = "fetch"
+	modeResolve  = "resolve"
+	modeMetadata = "metadata"
+)
+
+// effectiveMode maps the stored empty mode to fetch.
+func (e *MappingEntry) effectiveMode() string {
+	if e.Mode == "" {
+		return modeFetch
+	}
+	return e.Mode
 }
 
 // validAdapters is the adapter override allowlist: "" (auto-

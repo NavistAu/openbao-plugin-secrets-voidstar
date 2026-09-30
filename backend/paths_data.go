@@ -61,6 +61,14 @@ func (b *Backend) pathDataRead(ctx context.Context, req *logical.Request, data *
 		return nil, logical.CodedError(404, "voidstar: no mapping for view %q", view)
 	}
 
+	switch entry.Mode {
+	case modeMetadata:
+		return modeResponse(cfg, entry, map[string]interface{}{"mode": modeMetadata}), nil
+	case modeResolve:
+		path, _ := splitTargetPathField(entry.Target)
+		return modeResponse(cfg, entry, map[string]interface{}{"mode": modeResolve, "path": path}), nil
+	}
+
 	targetPath, field := splitTargetPathField(entry.Target)
 	mount := targetMount(targetPath)
 
@@ -114,4 +122,17 @@ func (b *Backend) pathDataRead(ctx context.Context, req *logical.Request, data *
 			"metadata": syntheticVersionMetadata(entry, cfg),
 		},
 	}, nil
+}
+
+// modeResponse is the read response for non-fetch mappings: empty data,
+// the mapping's custom_metadata, and a top-level voidstar marker. It never
+// touches the loopback.
+func modeResponse(cfg *Config, entry *MappingEntry, marker map[string]interface{}) *logical.Response {
+	return &logical.Response{
+		Data: map[string]interface{}{
+			"data":     map[string]interface{}{},
+			"metadata": syntheticVersionMetadata(entry, cfg),
+			"voidstar": marker,
+		},
+	}
 }

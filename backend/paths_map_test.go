@@ -498,3 +498,46 @@ func TestPathMap_TargetAdapterOnlyStill200(t *testing.T) {
 		t.Fatalf("resp=%+v err=%v", resp, err)
 	}
 }
+
+func TestPathMap_ModeValidation(t *testing.T) {
+	cases := map[string]map[string]interface{}{
+		"metadata with target":     {"mode": "metadata", "target": "kv/data/x"},
+		"metadata with empty tgt":  {"mode": "metadata", "target": ""},
+		"fetch without target":     {"mode": "fetch"},
+		"default without target":   {},
+		"resolve without target":   {"mode": "resolve"},
+		"adapter with metadata":    {"mode": "metadata", "adapter": "kv2"},
+		"adapter with resolve":     {"mode": "resolve", "target": "kv/data/x", "adapter": "kv2"},
+		"unknown mode":             {"mode": "bogus", "target": "kv/data/x"},
+		"resolve target with #fld": {"mode": "resolve", "target": "kv/data/x#f"},
+	}
+	for name, d := range cases {
+		t.Run(name, func(t *testing.T) {
+			b, storage := newTestBackend(t)
+			resp, err := writeMapping(t, b, storage, "v", d)
+			if err != nil || resp == nil || !resp.IsError() {
+				t.Fatalf("resp=%+v err=%v, want 400", resp, err)
+			}
+		})
+	}
+}
+
+func TestPathMap_ModeAccepted(t *testing.T) {
+	for name, d := range map[string]map[string]interface{}{
+		"metadata": {"mode": "metadata", "custom_metadata": cm("vault_token", "true")},
+		"resolve":  {"mode": "resolve", "target": "database/creds/x"},
+		"fetch":    {"mode": "fetch", "target": "kv/data/x", "adapter": "kv2"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			b, storage := newTestBackend(t)
+			resp, err := writeMapping(t, b, storage, "v", d)
+			if err != nil || (resp != nil && resp.IsError()) {
+				t.Fatalf("resp=%+v err=%v", resp, err)
+			}
+			r, _ := readMapping(t, b, storage, "v")
+			if r.Data["mode"] != name {
+				t.Fatalf("mode = %v, want %s", r.Data["mode"], name)
+			}
+		})
+	}
+}

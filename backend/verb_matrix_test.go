@@ -144,3 +144,24 @@ func TestVerbMatrix_AdminSurfaceNotShadowed(t *testing.T) {
 		t.Fatalf("admin/map read for unmapped view: resp = %+v, want nil", resp)
 	}
 }
+
+// TestVerbMatrix_ModesSupportedAndReadOnly: metadata/resolve views read and
+// list like any view, and stay read-only on the consumer surface.
+func TestVerbMatrix_ModesSupportedAndReadOnly(t *testing.T) {
+	b, storage, _, _ := newDereferenceTestBackend(t)
+	writeMapping(t, b, storage, "m/meta", map[string]interface{}{"mode": "metadata"})
+	writeMapping(t, b, storage, "m/res", map[string]interface{}{"mode": "resolve", "target": "database/creds/ro"})
+	for _, v := range []string{"m/meta", "m/res"} {
+		for _, p := range []string{"data/", "metadata/"} {
+			if _, err := doRequest(b, storage, logical.ReadOperation, p+v); err != nil {
+				t.Fatalf("read %s%s: %v", p, v, err)
+			}
+			if _, err := doRequest(b, storage, logical.UpdateOperation, p+v); codedStatus(err) != 405 {
+				t.Fatalf("update %s%s: want 405, got %v", p, v, err)
+			}
+		}
+	}
+	if _, err := doRequest(b, storage, logical.ListOperation, "metadata/m/"); err != nil {
+		t.Fatal(err)
+	}
+}

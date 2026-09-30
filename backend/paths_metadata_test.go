@@ -174,3 +174,26 @@ func TestPathMetadata_CustomMetadataFromMapping(t *testing.T) {
 		t.Fatalf("custom_metadata = %v", m)
 	}
 }
+
+func TestPathMetadata_ModesReadAndList(t *testing.T) {
+	b, storage := newTestBackend(t)
+	writeMapping(t, b, storage, "g/meta", map[string]interface{}{"mode": "metadata", "custom_metadata": cm("x", "y")})
+	writeMapping(t, b, storage, "g/res", map[string]interface{}{"mode": "resolve", "target": "database/creds/ro", "custom_metadata": cm("p", "q")})
+	l, err := listMetadata(t, b, storage, "g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := l.Data["keys"].([]string)
+	if len(keys) != 2 || keys[0] != "meta" || keys[1] != "res" {
+		t.Fatalf("keys = %v", keys)
+	}
+	for view, k := range map[string]string{"g/meta": "x", "g/res": "p"} {
+		r, err := readMetadata(t, b, storage, view)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := r.Data["custom_metadata"].(map[string]interface{})[k]; !ok {
+			t.Fatalf("%s: custom_metadata = %v", view, r.Data["custom_metadata"])
+		}
+	}
+}

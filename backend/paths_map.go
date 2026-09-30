@@ -29,12 +29,15 @@ func pathMap(b *Backend) *framework.Path {
 			},
 			"target": {
 				Type:        framework.TypeString,
-				Required:    true,
 				Description: "Canonical target this view points to: <mount>/<path>[#field].",
 			},
 			"adapter": {
 				Type:        framework.TypeString,
 				Description: `Adapter override: "kv2" or "raw". Empty auto-detects by target shape.`,
+			},
+			"mode": {
+				Type:        framework.TypeString,
+				Description: `Mapping mode: "fetch" (default), "resolve" or "metadata".`,
 			},
 			"custom_metadata": {
 				Type:        framework.TypeKVPairs,
@@ -91,6 +94,23 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 
 	target := data.Get("target").(string)
 	adapter := data.Get("adapter").(string)
+	mode := data.Get("mode").(string)
+	switch mode {
+	case "", modeFetch, modeResolve, modeMetadata:
+	default:
+		return logical.ErrorResponse(fmt.Sprintf("mode %q must be \"fetch\", \"resolve\" or \"metadata\"", mode)), nil
+	}
+	if mode == modeMetadata {
+		if _, present := data.Raw["target"]; present {
+			return logical.ErrorResponse("target must be absent for mode \"metadata\""), nil
+		}
+	}
+	if adapter != "" && mode != "" && mode != modeFetch {
+		return logical.ErrorResponse("adapter is only valid with mode \"fetch\""), nil
+	}
+	if mode == modeResolve && strings.Contains(target, "#") {
+		return logical.ErrorResponse("a #field suffix is not allowed on a resolve target"), nil
+	}
 	if !validAdapterOverride(adapter) {
 		return logical.ErrorResponse(fmt.Sprintf("adapter %q must be \"kv2\" or \"raw\"", adapter)), nil
 	}
@@ -100,15 +120,17 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 		return logical.ErrorResponse(err.Error()), nil
 	}
 
-	ownMount := strings.TrimSuffix(req.MountPoint, "/")
-	mount, err := canonicalizeTarget(target, ownMount)
-	if err != nil {
-		return logical.ErrorResponse(err.Error()), nil
-	}
+	if mode != modeMetadata {
+		ownMount := strings.TrimSuffix(req.MountPoint, "/")
+		mount, err := canonicalizeTarget(target, ownMount)
+		if err != nil {
+			return logical.ErrorResponse(err.Error()), nil
+		}
 
-	cfg := b.currentConfig()
-	if !cfg.targetMountAllowed(mount) {
-		return logical.ErrorResponse(fmt.Sprintf("target mount %q is not permitted", mount)), nil
+		cfg := b.currentConfig()
+		if !cfg.targetMountAllowed(mount) {
+			return logical.ErrorResponse(fmt.Sprintf("target mount %q is not permitted", mount)), nil
+		}
 	}
 
 	// A fresh MappingEntry, not a mutation of any existing one: this is
@@ -117,6 +139,7 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 	entry := &MappingEntry{
 		Target:         target,
 		Adapter:        adapter,
+		Mode:           mode,
 		CustomMetadata: customMD,
 		WriteTime:      time.Now().UTC(),
 	}
@@ -190,6 +213,7 @@ func mappingResponseData(entry *MappingEntry) map[string]interface{} {
 	return map[string]interface{}{
 		"target":             entry.Target,
 		"adapter":            entry.Adapter,
+		"mode":               entry.effectiveMode(),
 		"custom_metadata":    entry.CustomMetadata,
 		"write_time":         entry.WriteTime,
 		"quarantined":        entry.Quarantined,
