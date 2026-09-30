@@ -2,3 +2,4 @@
 *.test
 /bench/dist/
 /bench/scratch/
+.worktrees/
