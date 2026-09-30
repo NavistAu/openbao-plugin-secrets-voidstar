@@ -122,17 +122,21 @@ func syntheticVersionMetadata(entry *MappingEntry, cfg *Config) map[string]inter
 		"created_time":    entry.WriteTime,
 		"deletion_time":   "",
 		"destroyed":       false,
-		"custom_metadata": customMetadata(cfg, entry.Target),
+		"custom_metadata": customMetadata(cfg, entry),
 	}
 }
 
-// customMetadata is {voidstar_target: <target>} only when
-// cfg.ExposeTargets, else {}.
-func customMetadata(cfg *Config, target string) map[string]interface{} {
-	if cfg != nil && cfg.ExposeTargets {
-		return map[string]interface{}{"voidstar_target": target}
+// customMetadata is the mapping's own custom_metadata, plus
+// voidstar_target when cfg.ExposeTargets. Upstream metadata is never used.
+func customMetadata(cfg *Config, entry *MappingEntry) map[string]interface{} {
+	m := make(map[string]interface{}, len(entry.CustomMetadata)+1)
+	for k, v := range entry.CustomMetadata {
+		m[k] = v
 	}
-	return map[string]interface{}{}
+	if cfg != nil && cfg.ExposeTargets && entry.Target != "" {
+		m["voidstar_target"] = entry.Target
+	}
+	return m
 }
 
 // checkStaticContract enforces the static-contract detection: a

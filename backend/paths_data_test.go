@@ -362,3 +362,34 @@ func TestPathData_CustomMetadataGatedOnExposeTargets(t *testing.T) {
 		t.Errorf("custom_metadata = %v, want {voidstar_target: kv/data/x}", meta["custom_metadata"])
 	}
 }
+
+func TestPathData_CustomMetadataMappingOnly(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	fake.Reads["kv/data/x"] = FakeReadResponse{Data: map[string]interface{}{
+		"data":     map[string]interface{}{"k": "v"},
+		"metadata": map[string]interface{}{"custom_metadata": map[string]interface{}{"upstream": "leak"}},
+	}}
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("ironbark_images", "a,b")})
+	resp, err := readData(t, b, storage, "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := resp.Data["metadata"].(map[string]interface{})["custom_metadata"].(map[string]interface{})
+	if m["ironbark_images"] != "a,b" || len(m) != 1 {
+		t.Fatalf("custom_metadata = %v", m)
+	}
+}
+
+func TestPathData_CustomMetadataExposeTargets(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	cfgData := validConfigData()
+	cfgData["expose_targets"] = true
+	writeConfig(t, b, storage, cfgData)
+	fake.Reads["kv/data/x"] = FakeReadResponse{Data: map[string]interface{}{"data": map[string]interface{}{"k": "v"}}}
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("a", "b")})
+	resp, _ := readData(t, b, storage, "v")
+	m := resp.Data["metadata"].(map[string]interface{})["custom_metadata"].(map[string]interface{})
+	if m["a"] != "b" || m["voidstar_target"] != "kv/data/x" {
+		t.Fatalf("custom_metadata = %v", m)
+	}
+}

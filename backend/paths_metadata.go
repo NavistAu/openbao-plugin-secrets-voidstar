@@ -75,7 +75,7 @@ func (b *Backend) pathMetadataRead(ctx context.Context, req *logical.Request, da
 				"destroyed":     false,
 			},
 		},
-		"custom_metadata": customMetadata(cfg, entry.Target),
+		"custom_metadata": customMetadata(cfg, entry),
 	}}, nil
 }
 

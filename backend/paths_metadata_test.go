@@ -161,3 +161,16 @@ func TestPathMetadata_ListEmptyIs404(t *testing.T) {
 		t.Fatalf("status = %d, want 404", got)
 	}
 }
+
+func TestPathMetadata_CustomMetadataFromMapping(t *testing.T) {
+	b, storage := newTestBackend(t)
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("a", "b")})
+	resp, err := readMetadata(t, b, storage, "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := resp.Data["custom_metadata"].(map[string]interface{})
+	if m["a"] != "b" || len(m) != 1 {
+		t.Fatalf("custom_metadata = %v", m)
+	}
+}

@@ -36,6 +36,10 @@ func pathMap(b *Backend) *framework.Path {
 				Type:        framework.TypeString,
 				Description: `Adapter override: "kv2" or "raw". Empty auto-detects by target shape.`,
 			},
+			"custom_metadata": {
+				Type:        framework.TypeKVPairs,
+				Description: "String map returned as the view's custom_metadata (KV v2 limits).",
+			},
 		},
 
 		Operations: map[logical.Operation]framework.OperationHandler{
@@ -91,6 +95,11 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 		return logical.ErrorResponse(fmt.Sprintf("adapter %q must be \"kv2\" or \"raw\"", adapter)), nil
 	}
 
+	customMD := data.Get("custom_metadata").(map[string]string)
+	if err := validateCustomMetadata(customMD); err != nil {
+		return logical.ErrorResponse(err.Error()), nil
+	}
+
 	ownMount := strings.TrimSuffix(req.MountPoint, "/")
 	mount, err := canonicalizeTarget(target, ownMount)
 	if err != nil {
@@ -106,9 +115,10 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 	// what "rewrite clears quarantine" means —
 	// quarantine fields simply aren't carried forward.
 	entry := &MappingEntry{
-		Target:    target,
-		Adapter:   adapter,
-		WriteTime: time.Now().UTC(),
+		Target:         target,
+		Adapter:        adapter,
+		CustomMetadata: customMD,
+		WriteTime:      time.Now().UTC(),
 	}
 
 	storageEntry, err := logical.StorageEntryJSON(mapStorageKey(view), entry)
@@ -180,6 +190,7 @@ func mappingResponseData(entry *MappingEntry) map[string]interface{} {
 	return map[string]interface{}{
 		"target":             entry.Target,
 		"adapter":            entry.Adapter,
+		"custom_metadata":    entry.CustomMetadata,
 		"write_time":         entry.WriteTime,
 		"quarantined":        entry.Quarantined,
 		"quarantine_cause":   entry.QuarantineCause,

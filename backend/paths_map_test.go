@@ -434,11 +434,60 @@ func TestPathMap_RejectsUnknownFields(t *testing.T) {
 	}
 }
 
-func TestPathMap_CustomMetadataRejectedUntilSupported(t *testing.T) {
+func cm(kv ...string) map[string]interface{} {
+	m := map[string]interface{}{}
+	for i := 0; i < len(kv); i += 2 {
+		m[kv[i]] = kv[i+1]
+	}
+	return m
+}
+
+func TestPathMap_CustomMetadataRoundTripRewriteClear(t *testing.T) {
 	b, storage := newTestBackend(t)
-	resp, _ := writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": map[string]interface{}{"a": "b"}})
-	if resp == nil || !resp.IsError() {
-		t.Fatalf("resp = %+v, want error", resp)
+	if resp, err := writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("a", "b")}); err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("resp=%+v err=%v", resp, err)
+	}
+	r, _ := readMapping(t, b, storage, "v")
+	if got, _ := r.Data["custom_metadata"].(map[string]string); got["a"] != "b" || len(got) != 1 {
+		t.Fatalf("custom_metadata = %v", r.Data["custom_metadata"])
+	}
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("c", "d")})
+	r, _ = readMapping(t, b, storage, "v")
+	if got, _ := r.Data["custom_metadata"].(map[string]string); got["c"] != "d" || len(got) != 1 {
+		t.Fatalf("rewrite must replace: %v", r.Data["custom_metadata"])
+	}
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x"})
+	r, _ = readMapping(t, b, storage, "v")
+	if got, _ := r.Data["custom_metadata"].(map[string]string); len(got) != 0 {
+		t.Fatalf("write without field must clear: %v", r.Data["custom_metadata"])
+	}
+}
+
+func TestPathMap_CustomMetadataLimits(t *testing.T) {
+	many := map[string]interface{}{}
+	for i := 0; i < 65; i++ {
+		many[strings.Repeat("k", 3)+string(rune('a'+i%26))+strings.Repeat("x", i)] = "v"
+	}
+	cases := map[string]map[string]interface{}{
+		"65 keys":      many,
+		"key 129":      cm(strings.Repeat("k", 129), "v"),
+		"value 513":    cm("k", strings.Repeat("v", 513)),
+		"reserved key": cm("voidstar_target", "x"),
+	}
+	for name, m := range cases {
+		t.Run(name, func(t *testing.T) {
+			b, storage := newTestBackend(t)
+			resp, _ := writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": m})
+			if resp == nil || !resp.IsError() {
+				t.Fatalf("resp = %+v, want error", resp)
+			}
+		})
+	}
+	// boundaries accepted
+	b, storage := newTestBackend(t)
+	ok := cm(strings.Repeat("k", 128), strings.Repeat("v", 512))
+	if resp, err := writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": ok}); err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("boundary: resp=%+v err=%v", resp, err)
 	}
 }
 
