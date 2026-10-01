@@ -101,25 +101,26 @@ tok "$DBTOK" -X POST "$A/auth/token/revoke-self" >/dev/null
 sleep 1
 check "lease owned by token: revoked with it" 0 "$(root -X LIST "$A/sys/leases/lookup/database/creds/ro/" | jq '.data.keys // [] | length')"
 
-# 5. level metadata
-post vs/admin/level/repo/acme/mono '{"custom_metadata":{"branches":"main,release/*"}}' >/dev/null
-post vs/admin/level/repo/other/thing '{"custom_metadata":{"branches":"x"}}' >/dev/null
-check "level GET 200" '{"branches":"main,release/*"}' "$(root "$A/vs/metadata/repo/acme/mono/" | jq -c .data.custom_metadata)"
-check "level GET none -> 404" 404 "$(code root "$A/vs/metadata/nothing/here/")"
-post vs/admin/map/repo/acme/mono/db '{"target":"kv/data/src/one"}' >/dev/null
-check "LIST unchanged by level" '["db"]' "$(root -X LIST "$A/vs/metadata/repo/acme/mono/" | jq -c .data.keys)"
-# OpenBao core refuses writes to a path ending in '/' (400) before the plugin sees it.
-check "level write via metadata path refused" 400 "$(code root -X POST "$A/vs/metadata/repo/acme/mono/" -d '{"custom_metadata":{"a":"b"}}')"
+# 5. environment level: a metadata-only mapping named like the level, beside its folder
+post vs/admin/map/repo/acme/mono/prod '{"mode":"metadata","custom_metadata":{"branches":"main,release/*"}}' >/dev/null
+post vs/admin/map/repo/other/thing/prod '{"mode":"metadata","custom_metadata":{"branches":"x"}}' >/dev/null
+check "level entry readable" '{"branches":"main,release/*"}' "$(root "$A/vs/metadata/repo/acme/mono/prod" | jq -c .data.custom_metadata)"
+check "level with no secrets listed" '["prod"]' "$(root -X LIST "$A/vs/metadata/repo/acme/mono/" | jq -c .data.keys)"
+post vs/admin/map/repo/acme/mono/prod/db '{"target":"kv/data/src/one"}' >/dev/null
+check "entry and folder coexist in LIST" '["prod","prod/"]' "$(root -X LIST "$A/vs/metadata/repo/acme/mono/" | jq -c .data.keys)"
+check "folder LIST holds the secrets" '["db"]' "$(root -X LIST "$A/vs/metadata/repo/acme/mono/prod/" | jq -c .data.keys)"
 
-# 6. discovery grant: templated policy on level docs (spec 6.3)
+# 6. discovery grant: templated policy on the repo level (spec 6.3)
 post sys/auth/userpass '{"type":"userpass"}' >/dev/null
 ACC=$(root "$A/sys/auth" | jq -r '.data["userpass/"].accessor')
-root -X PUT "$A/sys/policies/acl/discover" -d "{\"policy\":\"path \\\"vs/metadata/repo/{{identity.entity.aliases.$ACC.name}}/+/\\\" {capabilities=[\\\"read\\\"]}\"}" >/dev/null
+POL="path \"vs/metadata/repo/{{identity.entity.aliases.$ACC.name}}/+/\" {capabilities=[\"list\"]}
+path \"vs/metadata/repo/{{identity.entity.aliases.$ACC.name}}/+/+\" {capabilities=[\"read\"]}"
+root -X PUT "$A/sys/policies/acl/discover" -d "$(jq -n --arg p "$POL" '{policy:$p}')" >/dev/null
 post auth/userpass/users/acme '{"password":"pw","token_policies":"discover"}' >/dev/null
 UTOK=$(curl -s -X POST "$A/auth/userpass/login/acme" -d '{"password":"pw"}' | jq -r .auth.client_token)
-check "discovery: own level 200" 200 "$(code "$UTOK" "$A/vs/metadata/repo/acme/mono/")"
-check "discovery: other org 403" 403 "$(code "$UTOK" "$A/vs/metadata/repo/other/thing/")"
-check "discovery: one level deeper 403" 403 "$(code "$UTOK" "$A/vs/metadata/repo/acme/mono/sub/")"
+check "discovery: LIST own repo level 200" 200 "$(code "$UTOK" -X LIST "$A/vs/metadata/repo/acme/mono/")"
+check "discovery: read env entry 200" 200 "$(code "$UTOK" "$A/vs/metadata/repo/acme/mono/prod")"
+check "discovery: other org 403" 403 "$(code "$UTOK" "$A/vs/metadata/repo/other/thing/prod")"
 
 # 7. Q12: %xx view names, wire-encoded
 root -X POST "$A/vs/admin/map/grp%252fbeta" -d '{"target":"kv/data/src/one"}' >/dev/null

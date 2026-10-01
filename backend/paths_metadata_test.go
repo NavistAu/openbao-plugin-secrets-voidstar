@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -195,5 +196,32 @@ func TestPathMetadata_ModesReadAndList(t *testing.T) {
 		if _, ok := r.Data["custom_metadata"].(map[string]interface{})[k]; !ok {
 			t.Fatalf("%s: custom_metadata = %v", view, r.Data["custom_metadata"])
 		}
+	}
+}
+
+// An environment level is a metadata-only mapping named like the level,
+// beside the level's folder of views (operator ruling 8a).
+func TestPathMetadata_LevelEntryBesideFolder(t *testing.T) {
+	b, storage := newTestBackend(t)
+	if resp, err := writeMapping(t, b, storage, "a/prod", map[string]interface{}{"mode": "metadata", "custom_metadata": cm("branches", "main")}); err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("write level entry: %+v %v", resp, err)
+	}
+	// Level with no secrets yet: still listed and readable.
+	l, err := listMetadata(t, b, storage, "a/")
+	if err != nil || fmt.Sprint(l.Data["keys"]) != "[prod]" {
+		t.Fatalf("list a/ = %+v %v", l, err)
+	}
+	writeMapping(t, b, storage, "a/prod/db", map[string]interface{}{"target": "kv/data/x"})
+	l, err = listMetadata(t, b, storage, "a/")
+	if err != nil || fmt.Sprint(l.Data["keys"]) != "[prod prod/]" {
+		t.Fatalf("list a/ = %+v %v, want [prod prod/]", l, err)
+	}
+	r, err := readMetadata(t, b, storage, "a/prod")
+	if err != nil || r.Data["custom_metadata"].(map[string]interface{})["branches"] != "main" {
+		t.Fatalf("read a/prod: %+v %v", r, err)
+	}
+	l, err = listMetadata(t, b, storage, "a/prod/")
+	if err != nil || fmt.Sprint(l.Data["keys"]) != "[db]" {
+		t.Fatalf("list a/prod/ = %+v %v", l, err)
 	}
 }

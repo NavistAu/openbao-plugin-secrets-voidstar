@@ -17,8 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mapping `mode`: `resolve` returns the target path (top-level
   `voidstar: {mode, path}`) without reading the target; `metadata` is a
   target-less mapping that carries only `custom_metadata`.
-- Level metadata: `admin/level/<prefix>` (GET/POST/DELETE/LIST), read back at
-  `GET <mount>/metadata/<prefix>/`.
 - `test/grant/run.sh`: integration checks on a throwaway OpenBao.
 
 ### Changed
