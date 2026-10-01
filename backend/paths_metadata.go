@@ -54,27 +54,6 @@ func (b *Backend) pathMetadataRead(ctx context.Context, req *logical.Request, da
 	view := data.Get("view").(string)
 	cfg := b.currentConfig()
 
-	// A trailing slash addresses a level (a prefix), not a view; a view
-	// path never ends in "/".
-	if strings.HasSuffix(view, "/") {
-		lvl, err := getLevel(ctx, req.Storage, view)
-		if err != nil {
-			return nil, err
-		}
-		if lvl == nil {
-			return nil, logical.CodedError(404, "voidstar: no level metadata for prefix %q", view)
-		}
-		md := make(map[string]interface{}, len(lvl.CustomMetadata))
-		for k, v := range lvl.CustomMetadata {
-			md[k] = v
-		}
-		return &logical.Response{Data: map[string]interface{}{
-			"custom_metadata": md,
-			"created_time":    lvl.WriteTime,
-			"updated_time":    lvl.WriteTime,
-		}}, nil
-	}
-
 	entry, err := getMappingFromStorage(ctx, req.Storage, view)
 	if err != nil {
 		return nil, err

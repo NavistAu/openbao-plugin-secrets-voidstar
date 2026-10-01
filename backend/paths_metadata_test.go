@@ -197,37 +197,3 @@ func TestPathMetadata_ModesReadAndList(t *testing.T) {
 		}
 	}
 }
-
-func TestPathMetadata_LevelRead(t *testing.T) {
-	b, storage := newTestBackend(t)
-	levelReq(t, b, storage, logical.UpdateOperation, "prod", map[string]interface{}{"custom_metadata": cm("branches", "main")})
-	resp, err := readMetadata(t, b, storage, "prod/")
-	if err != nil {
-		t.Fatalf("level read: %v", err)
-	}
-	if m := resp.Data["custom_metadata"].(map[string]interface{}); m["branches"] != "main" {
-		t.Fatalf("custom_metadata = %v", m)
-	}
-	if resp.Data["created_time"] == nil || resp.Data["updated_time"] == nil {
-		t.Fatalf("missing times: %v", resp.Data)
-	}
-	if _, err := readMetadata(t, b, storage, "none/"); codedStatus(err) != 404 {
-		t.Fatalf("none/: err = %v, want 404", err)
-	}
-}
-
-func TestPathMetadata_LevelDoesNotAffectListAndNeedsNoViews(t *testing.T) {
-	b, storage := newTestBackend(t)
-	levelReq(t, b, storage, logical.UpdateOperation, "prod", map[string]interface{}{"custom_metadata": cm("a", "b")})
-	if _, err := listMetadata(t, b, storage, "prod/"); codedStatus(err) != 404 {
-		t.Fatalf("list of level with no views: err = %v, want 404 (unchanged)", err)
-	}
-	writeMapping(t, b, storage, "prod/x", map[string]interface{}{"target": "kv/data/x"})
-	l, err := listMetadata(t, b, storage, "prod/")
-	if err != nil || len(l.Data["keys"].([]string)) != 1 {
-		t.Fatalf("list: %+v %v", l, err)
-	}
-	if _, err := readMetadata(t, b, storage, "prod/"); err != nil {
-		t.Fatalf("level still readable: %v", err)
-	}
-}

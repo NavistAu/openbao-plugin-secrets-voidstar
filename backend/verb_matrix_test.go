@@ -36,7 +36,6 @@ func TestVerbMatrix_405(t *testing.T) {
 	for _, op := range writeVerbs {
 		cases = append(cases, tc{"data/some/view", op})
 		cases = append(cases, tc{"metadata/some/view", op})
-		cases = append(cases, tc{"metadata/some/", op})
 	}
 	for _, path := range []string{"config", "delete/some/view", "undelete/some/view", "destroy/some/view", "detailed-metadata/some/view"} {
 		for _, op := range anyVerb {
