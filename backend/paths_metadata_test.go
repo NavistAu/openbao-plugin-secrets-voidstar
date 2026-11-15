@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -159,5 +160,68 @@ func TestPathMetadata_ListEmptyIs404(t *testing.T) {
 	}
 	if got := codedStatus(err); got != 404 {
 		t.Fatalf("status = %d, want 404", got)
+	}
+}
+
+func TestPathMetadata_CustomMetadataFromMapping(t *testing.T) {
+	b, storage := newTestBackend(t)
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("a", "b")})
+	resp, err := readMetadata(t, b, storage, "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := resp.Data["custom_metadata"].(map[string]interface{})
+	if m["a"] != "b" || len(m) != 1 {
+		t.Fatalf("custom_metadata = %v", m)
+	}
+}
+
+func TestPathMetadata_ModesReadAndList(t *testing.T) {
+	b, storage := newTestBackend(t)
+	writeMapping(t, b, storage, "g/meta", map[string]interface{}{"mode": "metadata", "custom_metadata": cm("x", "y")})
+	writeMapping(t, b, storage, "g/res", map[string]interface{}{"mode": "resolve", "target": "database/creds/ro", "custom_metadata": cm("p", "q")})
+	l, err := listMetadata(t, b, storage, "g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := l.Data["keys"].([]string)
+	if len(keys) != 2 || keys[0] != "meta" || keys[1] != "res" {
+		t.Fatalf("keys = %v", keys)
+	}
+	for view, k := range map[string]string{"g/meta": "x", "g/res": "p"} {
+		r, err := readMetadata(t, b, storage, view)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := r.Data["custom_metadata"].(map[string]interface{})[k]; !ok {
+			t.Fatalf("%s: custom_metadata = %v", view, r.Data["custom_metadata"])
+		}
+	}
+}
+
+// An environment level is a metadata-only mapping named like the level,
+// beside the level's folder of views (operator ruling 8a).
+func TestPathMetadata_LevelEntryBesideFolder(t *testing.T) {
+	b, storage := newTestBackend(t)
+	if resp, err := writeMapping(t, b, storage, "a/prod", map[string]interface{}{"mode": "metadata", "custom_metadata": cm("branches", "main")}); err != nil || (resp != nil && resp.IsError()) {
+		t.Fatalf("write level entry: %+v %v", resp, err)
+	}
+	// Level with no secrets yet: still listed and readable.
+	l, err := listMetadata(t, b, storage, "a/")
+	if err != nil || fmt.Sprint(l.Data["keys"]) != "[prod]" {
+		t.Fatalf("list a/ = %+v %v", l, err)
+	}
+	writeMapping(t, b, storage, "a/prod/db", map[string]interface{}{"target": "kv/data/x"})
+	l, err = listMetadata(t, b, storage, "a/")
+	if err != nil || fmt.Sprint(l.Data["keys"]) != "[prod prod/]" {
+		t.Fatalf("list a/ = %+v %v, want [prod prod/]", l, err)
+	}
+	r, err := readMetadata(t, b, storage, "a/prod")
+	if err != nil || r.Data["custom_metadata"].(map[string]interface{})["branches"] != "main" {
+		t.Fatalf("read a/prod: %+v %v", r, err)
+	}
+	l, err = listMetadata(t, b, storage, "a/prod/")
+	if err != nil || fmt.Sprint(l.Data["keys"]) != "[db]" {
+		t.Fatalf("list a/prod/ = %+v %v", l, err)
 	}
 }

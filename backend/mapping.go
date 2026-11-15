@@ -2,6 +2,7 @@ package backend
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -28,6 +29,13 @@ type MappingEntry struct {
 	// Adapter overrides shape-based adapter selection:
 	// "" (auto-detect), "kv2", or "raw".
 	Adapter string `json:"adapter,omitempty"`
+	// Mode is "" or "fetch" (dereference the target), "resolve" (return
+	// the target path, never call it) or "metadata" (no target; carries
+	// custom_metadata only).
+	Mode string `json:"mode,omitempty"`
+	// CustomMetadata is the mapping's own string map, returned as the
+	// view's synthetic custom_metadata. Upstream metadata is never copied.
+	CustomMetadata map[string]string `json:"custom_metadata,omitempty"`
 	// WriteTime is when this entry was last written, surfaced as the
 	// view's synthetic `created_time`/`updated_time`.
 	WriteTime time.Time `json:"write_time"`
@@ -42,6 +50,21 @@ type MappingEntry struct {
 	// attempt that led to this quarantine (e.g.
 	// "revoked", "revoke failed, token recycled").
 	RevocationOutcome string `json:"revocation_outcome,omitempty"`
+}
+
+// Mapping modes.
+const (
+	modeFetch    = "fetch"
+	modeResolve  = "resolve"
+	modeMetadata = "metadata"
+)
+
+// effectiveMode maps the stored empty mode to fetch.
+func (e *MappingEntry) effectiveMode() string {
+	if e.Mode == "" {
+		return modeFetch
+	}
+	return e.Mode
 }
 
 // validAdapters is the adapter override allowlist: "" (auto-
@@ -106,4 +129,30 @@ func canonicalizeTarget(target, ownMount string) (mount string, err error) {
 		return "", errors.New("target must not reference the engine's own mount")
 	}
 	return mount, nil
+}
+
+// KV v2 custom_metadata limits.
+const (
+	maxCustomMetadataKeys  = 64
+	maxCustomMetadataKey   = 128
+	maxCustomMetadataValue = 512
+)
+
+// validateCustomMetadata enforces the KV v2 limits and the reserved key.
+func validateCustomMetadata(m map[string]string) error {
+	if len(m) > maxCustomMetadataKeys {
+		return fmt.Errorf("custom_metadata has %d keys, max %d", len(m), maxCustomMetadataKeys)
+	}
+	for k, v := range m {
+		if k == "voidstar_target" {
+			return errors.New("custom_metadata key \"voidstar_target\" is reserved")
+		}
+		if len(k) > maxCustomMetadataKey {
+			return fmt.Errorf("custom_metadata key exceeds %d bytes", maxCustomMetadataKey)
+		}
+		if len(v) > maxCustomMetadataValue {
+			return fmt.Errorf("custom_metadata value for %q exceeds %d bytes", k, maxCustomMetadataValue)
+		}
+	}
+	return nil
 }

@@ -362,3 +362,114 @@ func TestPathData_CustomMetadataGatedOnExposeTargets(t *testing.T) {
 		t.Errorf("custom_metadata = %v, want {voidstar_target: kv/data/x}", meta["custom_metadata"])
 	}
 }
+
+func TestPathData_CustomMetadataMappingOnly(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	fake.Reads["kv/data/x"] = FakeReadResponse{Data: map[string]interface{}{
+		"data":     map[string]interface{}{"k": "v"},
+		"metadata": map[string]interface{}{"custom_metadata": map[string]interface{}{"upstream": "leak"}},
+	}}
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("ironbark_images", "a,b")})
+	resp, err := readData(t, b, storage, "v")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := resp.Data["metadata"].(map[string]interface{})["custom_metadata"].(map[string]interface{})
+	if m["ironbark_images"] != "a,b" || len(m) != 1 {
+		t.Fatalf("custom_metadata = %v", m)
+	}
+}
+
+func TestPathData_CustomMetadataExposeTargets(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	cfgData := validConfigData()
+	cfgData["expose_targets"] = true
+	writeConfig(t, b, storage, cfgData)
+	fake.Reads["kv/data/x"] = FakeReadResponse{Data: map[string]interface{}{"data": map[string]interface{}{"k": "v"}}}
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x", "custom_metadata": cm("a", "b")})
+	resp, _ := readData(t, b, storage, "v")
+	m := resp.Data["metadata"].(map[string]interface{})["custom_metadata"].(map[string]interface{})
+	if m["a"] != "b" || m["voidstar_target"] != "kv/data/x" {
+		t.Fatalf("custom_metadata = %v", m)
+	}
+}
+
+func TestPathData_MetadataMode(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	factoryCalls := 0
+	b.clientFactory = func(ctx context.Context, cfg *Config) (LoopbackClient, int, error) {
+		factoryCalls++
+		return fake, 300, nil
+	}
+	writeMapping(t, b, storage, "m", map[string]interface{}{"mode": "metadata", "custom_metadata": cm("vault_token", "true")})
+	resp, err := readData(t, b, storage, "m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := resp.Data["data"].(map[string]interface{}); len(d) != 0 {
+		t.Fatalf("data = %v, want empty", d)
+	}
+	md := resp.Data["metadata"].(map[string]interface{})["custom_metadata"].(map[string]interface{})
+	if md["vault_token"] != "true" {
+		t.Fatalf("custom_metadata = %v", md)
+	}
+	if v := resp.Data["voidstar"].(map[string]interface{}); v["mode"] != "metadata" || len(v) != 1 {
+		t.Fatalf("voidstar = %v", v)
+	}
+	if fake.ReadCalls != 0 || factoryCalls != 0 {
+		t.Fatalf("loopback touched: reads=%d factory=%d", fake.ReadCalls, factoryCalls)
+	}
+}
+
+func TestPathData_FetchHasNoVoidstarKey(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	fake.Reads["kv/data/x"] = FakeReadResponse{Data: map[string]interface{}{"data": map[string]interface{}{"k": "v"}}}
+	writeMapping(t, b, storage, "v", map[string]interface{}{"target": "kv/data/x"})
+	resp, _ := readData(t, b, storage, "v")
+	if _, ok := resp.Data["voidstar"]; ok {
+		t.Fatal("fetch response must carry no voidstar key")
+	}
+}
+
+func TestPathData_ResolveMode(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	factoryCalls := 0
+	b.clientFactory = func(ctx context.Context, cfg *Config) (LoopbackClient, int, error) {
+		factoryCalls++
+		return fake, 300, nil
+	}
+	writeMapping(t, b, storage, "r", map[string]interface{}{"mode": "resolve", "target": "database/creds/ro", "custom_metadata": cm("a", "b")})
+	failsBefore, _ := b.loopbackGov.snapshot()
+	resp, err := readData(t, b, storage, "r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := resp.Data["data"].(map[string]interface{}); len(d) != 0 {
+		t.Fatalf("data = %v, want empty", d)
+	}
+	v := resp.Data["voidstar"].(map[string]interface{})
+	if v["mode"] != "resolve" || v["path"] != "database/creds/ro" {
+		t.Fatalf("voidstar = %v", v)
+	}
+	if md := resp.Data["metadata"].(map[string]interface{})["custom_metadata"].(map[string]interface{}); md["a"] != "b" {
+		t.Fatalf("custom_metadata = %v", md)
+	}
+	if fake.ReadCalls != 0 || factoryCalls != 0 {
+		t.Fatalf("loopback touched: reads=%d factory=%d", fake.ReadCalls, factoryCalls)
+	}
+	if failsAfter, _ := b.loopbackGov.snapshot(); failsAfter != failsBefore {
+		t.Fatal("governor state changed")
+	}
+}
+
+func TestPathData_ResolveIgnoresQuarantineAfterRewrite(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	fake.Reads["kv/data/x"] = FakeReadResponse{Data: map[string]interface{}{"data": map[string]interface{}{"a": "b"}}, LeaseID: "l1"}
+	writeMapping(t, b, storage, "q", map[string]interface{}{"target": "kv/data/x"})
+	readData(t, b, storage, "q") // quarantines
+	writeMapping(t, b, storage, "q", map[string]interface{}{"mode": "resolve", "target": "kv/data/x"})
+	resp, err := readData(t, b, storage, "q")
+	if err != nil || resp.Data["voidstar"].(map[string]interface{})["mode"] != "resolve" {
+		t.Fatalf("resp=%+v err=%v", resp, err)
+	}
+}

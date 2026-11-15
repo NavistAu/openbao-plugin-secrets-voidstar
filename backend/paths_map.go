@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,12 +29,19 @@ func pathMap(b *Backend) *framework.Path {
 			},
 			"target": {
 				Type:        framework.TypeString,
-				Required:    true,
 				Description: "Canonical target this view points to: <mount>/<path>[#field].",
 			},
 			"adapter": {
 				Type:        framework.TypeString,
 				Description: `Adapter override: "kv2" or "raw". Empty auto-detects by target shape.`,
+			},
+			"mode": {
+				Type:        framework.TypeString,
+				Description: `Mapping mode: "fetch" (default), "resolve" or "metadata".`,
+			},
+			"custom_metadata": {
+				Type:        framework.TypeKVPairs,
+				Description: "String map returned as the view's custom_metadata (KV v2 limits).",
 			},
 		},
 
@@ -80,30 +88,60 @@ func (b *Backend) pathMapWrite(ctx context.Context, req *logical.Request, data *
 		return logical.ErrorResponse("view path is required"), nil
 	}
 
+	if msg := unknownFields(data); msg != "" {
+		return logical.ErrorResponse(msg), nil
+	}
+
 	target := data.Get("target").(string)
 	adapter := data.Get("adapter").(string)
+	mode := data.Get("mode").(string)
+	switch mode {
+	case "", modeFetch, modeResolve, modeMetadata:
+	default:
+		return logical.ErrorResponse(fmt.Sprintf("mode %q must be \"fetch\", \"resolve\" or \"metadata\"", mode)), nil
+	}
+	if mode == modeMetadata {
+		if _, present := data.Raw["target"]; present {
+			return logical.ErrorResponse("target must be absent for mode \"metadata\""), nil
+		}
+	}
+	if adapter != "" && mode != "" && mode != modeFetch {
+		return logical.ErrorResponse("adapter is only valid with mode \"fetch\""), nil
+	}
+	if mode == modeResolve && strings.Contains(target, "#") {
+		return logical.ErrorResponse("a #field suffix is not allowed on a resolve target"), nil
+	}
 	if !validAdapterOverride(adapter) {
 		return logical.ErrorResponse(fmt.Sprintf("adapter %q must be \"kv2\" or \"raw\"", adapter)), nil
 	}
 
-	ownMount := strings.TrimSuffix(req.MountPoint, "/")
-	mount, err := canonicalizeTarget(target, ownMount)
-	if err != nil {
+	customMD := data.Get("custom_metadata").(map[string]string)
+	if err := validateCustomMetadata(customMD); err != nil {
 		return logical.ErrorResponse(err.Error()), nil
 	}
 
-	cfg := b.currentConfig()
-	if !cfg.targetMountAllowed(mount) {
-		return logical.ErrorResponse(fmt.Sprintf("target mount %q is not permitted", mount)), nil
+	if mode != modeMetadata {
+		ownMount := strings.TrimSuffix(req.MountPoint, "/")
+		mount, err := canonicalizeTarget(target, ownMount)
+		if err != nil {
+			return logical.ErrorResponse(err.Error()), nil
+		}
+
+		cfg := b.currentConfig()
+		if !cfg.targetMountAllowed(mount) {
+			return logical.ErrorResponse(fmt.Sprintf("target mount %q is not permitted", mount)), nil
+		}
 	}
 
 	// A fresh MappingEntry, not a mutation of any existing one: this is
 	// what "rewrite clears quarantine" means —
 	// quarantine fields simply aren't carried forward.
 	entry := &MappingEntry{
-		Target:    target,
-		Adapter:   adapter,
-		WriteTime: time.Now().UTC(),
+		Target:         target,
+		Adapter:        adapter,
+		Mode:           mode,
+		CustomMetadata: customMD,
+		WriteTime:      time.Now().UTC(),
 	}
 
 	storageEntry, err := logical.StorageEntryJSON(mapStorageKey(view), entry)
@@ -137,6 +175,22 @@ func (b *Backend) pathMapList(ctx context.Context, req *logical.Request, data *f
 	return logical.ListResponse(keys), nil
 }
 
+// unknownFields returns a 400 message naming every posted field that is
+// not in the path's schema (sorted), or "" when all are known.
+func unknownFields(data *framework.FieldData) string {
+	var bad []string
+	for k := range data.Raw {
+		if _, ok := data.Schema[k]; !ok {
+			bad = append(bad, k)
+		}
+	}
+	if len(bad) == 0 {
+		return ""
+	}
+	sort.Strings(bad)
+	return "unknown field(s): " + strings.Join(bad, ", ")
+}
+
 // getMappingFromStorage reads view's mapping entry fresh from storage,
 // or nil if none exists.
 func getMappingFromStorage(ctx context.Context, storage logical.Storage, view string) (*MappingEntry, error) {
@@ -159,6 +213,8 @@ func mappingResponseData(entry *MappingEntry) map[string]interface{} {
 	return map[string]interface{}{
 		"target":             entry.Target,
 		"adapter":            entry.Adapter,
+		"mode":               entry.effectiveMode(),
+		"custom_metadata":    entry.CustomMetadata,
 		"write_time":         entry.WriteTime,
 		"quarantined":        entry.Quarantined,
 		"quarantine_cause":   entry.QuarantineCause,

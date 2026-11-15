@@ -7,6 +7,26 @@ called out explicitly.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.2.0] - 2026-11-15
+
+### Added
+
+- Mapping `custom_metadata`: a string map returned as the view's
+  `custom_metadata` on data and metadata reads. The upstream target's
+  metadata is never copied.
+- Mapping `mode`: `resolve` returns the target path (top-level
+  `voidstar: {mode, path}`) without reading the target; `metadata` is a
+  target-less mapping that carries only `custom_metadata`.
+- `test/grant/run.sh`: integration checks on a throwaway OpenBao.
+
+### Changed
+
+- Mapping writes reject unknown fields with 400
+  `unknown field(s): ...` (previously silently ignored). `target` is now
+  required per mode rather than by the schema.
+
 ## [0.1.0] - 2026-08-19
 
 ### Added

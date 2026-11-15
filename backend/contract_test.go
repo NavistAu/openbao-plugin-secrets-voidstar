@@ -249,3 +249,19 @@ func TestStaticContract_RewriteClearsQuarantine(t *testing.T) {
 		t.Fatal("read after rewrite: nil response")
 	}
 }
+
+func TestStaticContract_NeverRunsForResolve(t *testing.T) {
+	b, storage, fake, _ := newDereferenceTestBackend(t)
+	fake.Reads["database/creds/ro"] = FakeReadResponse{Data: map[string]interface{}{}, LeaseID: "lease-9"}
+	writeMapping(t, b, storage, "r", map[string]interface{}{"mode": "resolve", "target": "database/creds/ro"})
+	if _, err := readData(t, b, storage, "r"); err != nil {
+		t.Fatal(err)
+	}
+	if fake.ReadCalls != 0 || fake.RevokeLeaseCalls != 0 {
+		t.Fatalf("reads=%d revokes=%d", fake.ReadCalls, fake.RevokeLeaseCalls)
+	}
+	e, _ := getMappingFromStorage(context.Background(), storage, "r")
+	if e.Quarantined {
+		t.Fatal("resolve mapping quarantined")
+	}
+}
